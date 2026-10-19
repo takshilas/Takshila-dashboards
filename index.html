@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Britax US competitive pricing</title>
+<meta name="description" content="Britax US Amazon competitive pricing: Britax SKUs vs competitor brands, last 52 weeks.">
+<meta property="og:title" content="Britax US competitive pricing">
+<meta property="og:description" content="Britax SKUs vs competitor brands on Amazon US, last 52 weeks.">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#FFFFFF; --ink:#210235; --body:#000000; --muted:#5b5266; --line:#E7E2EC; --soft:#F7F4FA;
+    --britax:#C231FF; --comp:#1F22B2; --sec:#5AAFFE; --up:#B42318; --down:#067647;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--body); font-family:'DM Sans',system-ui,sans-serif; font-size:15px; line-height:1.45; }
+  main { max-width:1180px; margin:0 auto; padding:28px 16px 64px; }
+  h1 { color:var(--ink); font-size:28px; margin:0 0 4px; font-weight:700; }
+  h2 { color:var(--ink); font-size:18px; margin:0 0 4px; font-weight:700; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .eyebrow { color:var(--britax); font-weight:700; font-size:12px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:18px; margin-top:18px; background:#fff; }
+  .tabs { display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 0; }
+  .tab { border:1px solid var(--line); background:#fff; color:var(--ink); padding:8px 14px; border-radius:999px; font:inherit; cursor:pointer; }
+  .tab[aria-selected="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .tab:focus-visible, input:focus-visible, button:focus-visible, th button:focus-visible { outline:2px solid var(--sec); outline-offset:2px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-top:16px; }
+  .tile { border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--soft); }
+  .tile .k { color:var(--muted); font-size:12px; }
+  .tile .v { color:var(--ink); font-size:26px; font-weight:700; margin:2px 0; }
+  .tile .d { font-size:12px; color:var(--muted); }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; margin:8px 0; font-size:13px; color:var(--muted); }
+  .legend i { display:inline-block; width:18px; height:3px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+  .chartwrap { position:relative; }
+  svg text { font-family:'DM Sans',system-ui,sans-serif; }
+  .tip { position:absolute; pointer-events:none; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; box-shadow:0 4px 14px rgba(33,2,53,.12); display:none; min-width:170px; z-index:2; }
+  .tip b { color:var(--ink); }
+  .tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .tbl th, .tbl td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  .tbl th:first-child, .tbl td:first-child, .tbl .l { text-align:left; }
+  .tbl th { color:var(--muted); font-weight:500; font-size:12px; }
+  .tbl th button { all:unset; cursor:pointer; color:inherit; }
+  .tbl tr.me td { background:#FAF0FF; font-weight:700; }
+  .scroll { overflow-x:auto; }
+  .bar { display:inline-block; height:8px; background:var(--sec); border-radius:0 4px 4px 0; vertical-align:middle; margin-right:6px; }
+  .me .bar { background:var(--britax); }
+  #skuTbl th:nth-child(-n+3) { text-align:left; }
+  .title { max-width:260px; overflow:hidden; text-overflow:ellipsis; }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0; }
+  input[type=search] { border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; min-width:220px; }
+  .btn { border:1px solid var(--ink); background:var(--ink); color:#fff; border-radius:8px; padding:8px 12px; font:inherit; cursor:pointer; }
+  ul.notes { margin:8px 0 0 18px; padding:0; color:var(--body); }
+  ul.notes li { margin:4px 0; }
+  .warn { background:#FFF7E6; border:1px solid #F2D9A6; border-radius:10px; padding:10px 12px; font-size:13px; margin-top:12px; }
+  a { color:var(--comp); }
+  .empty { color:var(--muted); padding:18px 0; }
+  @media (max-width:600px) { h1 { font-size:22px; } .tile .v { font-size:22px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">CommerceIQ · Market intelligence</div>
+  <h1>Britax US competitive pricing</h1>
+  <p class="sub" id="window">Amazon US · last 52 weeks</p>
+
+  <div role="tablist" aria-label="Segment" class="tabs" id="segTabs"></div>
+
+  <section class="tiles" id="tiles" aria-live="polite"></section>
+
+  <section class="card">
+    <h2>Average selling price by week</h2>
+    <p class="sub" style="margin-bottom:0" id="chartSub"></p>
+    <div class="legend">
+      <span><i style="background:var(--britax)"></i>Britax</span>
+      <span><i style="background:var(--comp)"></i>Competitor brands (all)</span>
+    </div>
+    <div class="chartwrap" id="chartWrap"><svg id="chart" role="img" aria-label="Weekly average selling price, Britax vs competitors"></svg><div class="tip" id="tip"></div></div>
+    <ul class="notes" id="insights"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Brand price ladder</h2>
+    <p class="sub" style="margin-bottom:6px">52-week average selling price by brand in the selected segment. Click a column to sort.</p>
+    <div class="scroll"><table class="tbl" id="brandTbl"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Britax SKUs vs segment competitors</h2>
+    <p class="sub" style="margin-bottom:0">Top 40 Britax ASINs by estimated sales. Index compares each SKU's 52-week ASP with the competitor average for its segment (100 = same price).</p>
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search ASIN or product" aria-label="Search ASIN or product">
+      <label><input type="checkbox" id="allSeg"> Show all segments</label>
+      <button class="btn" id="csv">Export CSV</button>
+    </div>
+    <div class="scroll"><table class="tbl" id="skuTbl"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Method and data notes</h2>
+    <ul class="notes">
+      <li><b>Source:</b> <code>client_catalog.marketshare_cubes.ms_estimations_metadata</code>, Britax US instance 1224, one row per ASIN per week (Sunday week start), Amazon US. Window is computed from the latest week in the data (<span id="wkRange"></span>).</li>
+      <li><b>Price is implied, not a shelf price.</b> ASP = estimated sales ÷ estimated units. It blends promotions, coupons, mix and 1P/3P sellers, so it will not match the price on the detail page on any given day.</li>
+      <li><b>Competitor brands</b> are every brand flagged as a competitor in the Market Share category (all sellers). Segment-level ASP is volume-weighted, so a competitor with cheaper or more premium models changes the average. Use the SKU table for like-for-like checks.</li>
+      <li><b>Estimates vs actuals:</b> for Britax, estimated sales for the window are about 77% of Vendor Central ordered revenue ($27.7M vs $35.7M) and estimated ASP is about 8% lower ($234 vs $253). Use this view for relative price position, not for revenue reporting.</li>
+      <li><b>Double strollers:</b> Britax has no sales in this segment in the window, so only competitor prices are shown.</li>
+      <li><b>Event weeks:</b> competitor units jump in the weeks starting 2026-06-21 and 2026-10-04, which likely line up with Prime events. Price dips in those weeks are mostly deal pricing. Verify the event dates before quoting them.</li>
+      <li>Last 13 weeks vs prior 13 weeks compares weeks 40–52 with weeks 27–39 of the window.</li>
+    </ul>
+    <div class="warn"><b>Internal draft.</b> This page has no login yet. Add the password page and sign-in gate from the Build Your Own Dashboard guide before sharing it with Britax.</div>
+  </section>
+</main>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  var D = window.BRITAX_DATA, SEG = D.segments, W = D.weeks;
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt$ = function (v) { return v == null || isNaN(v) ? '—' : '$' + Math.round(v).toLocaleString('en-US'); };
+  var fmtN = function (v) { return v == null || isNaN(v) ? '—' : Math.round(v).toLocaleString('en-US'); };
+  var pct = function (v, d) { return v == null || !isFinite(v) ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(d == null ? 1 : d) + '%'; };
+  var base = Date.UTC(+D.firstWeek.slice(0, 4), +D.firstWeek.slice(5, 7) - 1, +D.firstWeek.slice(8, 10));
+  function wkDate(i) { return new Date(base + i * 7 * 864e5); }
+  function wkStr(i) { return wkDate(i).toISOString().slice(0, 10); }
+  function wkLbl(i) { return wkDate(i).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  // ---- parse ----
+  var wk = SEG.map(function () { return []; });
+  D.weekly.split(';').forEach(function (r) {
+    var f = r.split(',').map(Number), o;
+    if (f.length === 6) o = { b: f[2] || null, c: f[3] || null, bu: f[4], cu: f[5] };
+    else o = { b: null, c: f[2] || null, bu: f[3], cu: f[4] };
+    wk[f[1]][f[0]] = o;
+  });
+  var brands = D.brands.split(';').map(function (r) {
+    var f = r.split(',');
+    return { br: f[0], si: +f[1], sales: +f[2] * 1000, units: +f[3], a13: f[4] === '' ? null : +f[4], ap: f[5] === '' ? null : +f[5] };
+  });
+  var skus = D.skus.split(';').map(function (r) {
+    var f = r.split('~');
+    return { asin: f[0], title: f[1] || '(title not available)', si: +f[2], sales: +f[3] * 1000, units: +f[4],
+      a13: f[5] === '' ? null : +f[5], ap: f[6] === '' ? null : +f[6], lo: +f[7], hi: +f[8], wks: +f[9] };
+  });
+
+  // ---- aggregates ----
+  function wavg(arr, key, ukey, from, to) {
+    var s = 0, u = 0;
+    for (var i = from; i <= to; i++) { var o = arr[i]; if (o && o[key] != null && o[ukey] > 0) { s += o[key] * o[ukey]; u += o[ukey]; } }
+    return u ? s / u : null;
+  }
+  function units(arr, ukey, from, to) { var u = 0; for (var i = from; i <= to; i++) if (arr[i]) u += arr[i][ukey]; return u; }
+  function segStats(si) {
+    var a = wk[si], bobU = brands.filter(function (b) { return b.si === si && b.br === 'Bob Gear'; }).reduce(function (s, b) { return s + b.units; }, 0);
+    var bu = units(a, 'bu', 0, W - 1), cu = units(a, 'cu', 0, W - 1);
+    return {
+      bAsp: wavg(a, 'b', 'bu', 0, W - 1), cAsp: wavg(a, 'c', 'cu', 0, W - 1),
+      b13: wavg(a, 'b', 'bu', W - 13, W - 1), bP: wavg(a, 'b', 'bu', W - 26, W - 14),
+      c13: wavg(a, 'c', 'cu', W - 13, W - 1), cP: wavg(a, 'c', 'cu', W - 26, W - 14),
+      bu: bu, cu: cu, totalUnits: bu + cu + bobU
+    };
+  }
+
+  var cur = 0;
+  // ---- tabs ----
+  var tabs = $('segTabs');
+  SEG.forEach(function (name, i) {
+    var b = document.createElement('button');
+    b.className = 'tab'; b.setAttribute('role', 'tab'); b.textContent = name;
+    b.setAttribute('aria-selected', i === cur ? 'true' : 'false');
+    b.onclick = function () { cur = i; render(); };
+    tabs.appendChild(b);
+  });
+  $('window').textContent = 'Amazon US · ' + W + ' weeks · week of ' + wkStr(0) + ' to week of ' + wkStr(W - 1);
+  $('wkRange').textContent = wkStr(0) + ' to ' + wkStr(W - 1);
+
+  function tile(k, v, d, cls) { return '<div class="tile"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="d ' + (cls || '') + '">' + (d || '&nbsp;') + '</div></div>'; }
+
+  function renderTiles(s) {
+    var idx = s.bAsp && s.cAsp ? s.bAsp / s.cAsp * 100 : null;
+    var bCh = s.b13 && s.bP ? s.b13 / s.bP - 1 : null, cCh = s.c13 && s.cP ? s.c13 / s.cP - 1 : null;
+    $('tiles').innerHTML =
+      tile('Britax ASP (52 weeks)', fmt$(s.bAsp), s.bu ? fmtN(s.bu) + ' est. units' : 'No Britax sales in this segment') +
+      tile('Competitor ASP (52 weeks)', fmt$(s.cAsp), fmtN(s.cu) + ' est. units') +
+      tile('Britax price index', idx == null ? '—' : Math.round(idx), idx == null ? '' : (idx >= 100 ? Math.round(idx - 100) + '% above' : Math.round(100 - idx) + '% below') + ' competitors') +
+      tile('Britax ASP, last 13 wks', pct(bCh), 'vs prior 13 weeks (' + fmt$(s.b13) + ' vs ' + fmt$(s.bP) + ')', '') +
+      tile('Competitor ASP, last 13 wks', pct(cCh), 'vs prior 13 weeks (' + fmt$(s.c13) + ' vs ' + fmt$(s.cP) + ')', '') +
+      tile('Britax unit share', s.totalUnits ? (s.bu / s.totalUnits * 100).toFixed(1) + '%' : '—', 'of est. units in segment');
+  }
+
+  // ---- chart ----
+  function renderChart(si) {
+    var a = wk[si], svg = $('chart'), wrap = $('chartWrap');
+    var w = Math.max(wrap.clientWidth, 320), h = 340, m = { l: 52, r: 16, t: 14, b: 30 };
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); svg.setAttribute('width', w); svg.setAttribute('height', h);
+    var vals = [];
+    a.forEach(function (o) { if (o) { if (o.b != null && o.bu > 0) vals.push(o.b); if (o.c != null) vals.push(o.c); } });
+    var lo = Math.floor(Math.min.apply(null, vals) * 0.92 / 10) * 10, hi = Math.ceil(Math.max.apply(null, vals) * 1.05 / 10) * 10;
+    var x = function (i) { return m.l + (w - m.l - m.r) * i / (W - 1); };
+    var y = function (v) { return h - m.b - (h - m.t - m.b) * (v - lo) / (hi - lo); };
+    var out = '';
+    for (var t = 0; t <= 4; t++) {
+      var v = lo + (hi - lo) * t / 4;
+      out += '<line x1="' + m.l + '" x2="' + (w - m.r) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="#E7E2EC" stroke-width="1"/>' +
+        '<text x="' + (m.l - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11" fill="#5b5266">$' + Math.round(v) + '</text>';
+    }
+    for (var i = 0; i < W; i++) if (i === 0 || wkDate(i).getUTCMonth() !== wkDate(i - 1).getUTCMonth()) out += '<text x="' + x(i) + '" y="' + (h - 8) + '" text-anchor="middle" font-size="11" fill="#5b5266">' + wkLbl(i) + '</text>';
+    function path(key, ukey, color) {
+      var d = '', pen = false;
+      for (var i = 0; i < W; i++) {
+        var o = a[i];
+        if (o && o[key] != null && o[ukey] > 0) { d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(o[key]).toFixed(1); pen = true; } else pen = false;
+      }
+      return d ? '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' : '';
+    }
+    out += path('c', 'cu', '#1F22B2') + path('b', 'bu', '#C231FF');
+    out += '<line id="xh" y1="' + m.t + '" y2="' + (h - m.b) + '" stroke="#210235" stroke-opacity=".35" stroke-width="1" style="display:none"/>';
+    out += '<circle id="hb" r="4" fill="#C231FF" stroke="#fff" stroke-width="2" style="display:none"/><circle id="hc" r="4" fill="#1F22B2" stroke="#fff" stroke-width="2" style="display:none"/>';
+    out += '<rect id="hit" x="' + m.l + '" y="' + m.t + '" width="' + (w - m.l - m.r) + '" height="' + (h - m.t - m.b) + '" fill="transparent"/>';
+    svg.innerHTML = out;
+    var tip = $('tip'), hit = $('hit');
+    function show(ev) {
+      var r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (w / r.width);
+      var i = Math.max(0, Math.min(W - 1, Math.round((px - m.l) / (w - m.l - m.r) * (W - 1)))), o = a[i];
+      if (!o) return;
+      var xh = $('xh'); xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.style.display = '';
+      var hb = $('hb'), hc = $('hc');
+      if (o.b != null && o.bu > 0) { hb.setAttribute('cx', x(i)); hb.setAttribute('cy', y(o.b)); hb.style.display = ''; } else hb.style.display = 'none';
+      if (o.c != null) { hc.setAttribute('cx', x(i)); hc.setAttribute('cy', y(o.c)); hc.style.display = ''; } else hc.style.display = 'none';
+      var idx = o.b && o.c && o.bu > 0 ? Math.round(o.b / o.c * 100) : null;
+      tip.innerHTML = '<b>Week of ' + wkStr(i) + '</b><br><span style="color:#C231FF">●</span> Britax: ' + (o.bu > 0 ? fmt$(o.b) + ' · ' + fmtN(o.bu) + ' units' : '—') +
+        '<br><span style="color:#1F22B2">●</span> Competitors: ' + fmt$(o.c) + ' · ' + fmtN(o.cu) + ' units' + (idx ? '<br>Index: ' + idx : '');
+      tip.style.display = 'block';
+      var tx = x(i) * (r.width / w) + 12; if (tx + 190 > r.width) tx = x(i) * (r.width / w) - 190;
+      tip.style.left = tx + 'px'; tip.style.top = '10px';
+    }
+    hit.addEventListener('mousemove', show); hit.addEventListener('touchstart', function (e) { show(e.touches[0]); }, { passive: true });
+    hit.addEventListener('touchmove', function (e) { show(e.touches[0]); }, { passive: true });
+    hit.addEventListener('mouseleave', function () { tip.style.display = 'none'; ['xh', 'hb', 'hc'].forEach(function (id) { $(id).style.display = 'none'; }); });
+  }
+
+  // ---- insights ----
+  function renderInsights(si, s) {
+    var li = [], a = wk[si];
+    if (s.bu) {
+      var idx = s.bAsp / s.cAsp * 100;
+      li.push('Britax sold at an average <b>' + fmt$(s.bAsp) + '</b> vs <b>' + fmt$(s.cAsp) + '</b> for competitors (index ' + Math.round(idx) + '). Mix matters: this compares all Britax models with all competitor models in the segment.');
+      var low = null, hiW = null;
+      for (var i = 0; i < W; i++) { var o = a[i]; if (o && o.b != null && o.bu > 0) { if (!low || o.b < low.b) low = { i: i, b: o.b }; if (!hiW || o.b > hiW.b) hiW = { i: i, b: o.b }; } }
+      if (low) li.push('Britax weekly ASP ranged from <b>' + fmt$(low.b) + '</b> (week of ' + wkStr(low.i) + ') to <b>' + fmt$(hiW.b) + '</b> (week of ' + wkStr(hiW.i) + ').');
+    } else li.push('Britax has no sales in this segment in the window. Competitor prices are shown for reference.');
+    var mv = brands.filter(function (b) { return b.si === si && b.a13 && b.ap && b.br !== 'Bob Gear' && b.units > 500; })
+      .map(function (b) { return { br: b.br, ch: b.a13 / b.ap - 1, a13: b.a13, ap: b.ap }; })
+      .sort(function (p, q) { return Math.abs(q.ch) - Math.abs(p.ch); }).slice(0, 2);
+    if (mv.length) li.push('Biggest competitor price moves, last 13 weeks vs prior 13: ' + mv.map(function (m) { return '<b>' + esc(m.br) + '</b> ' + pct(m.ch) + ' (' + fmt$(m.ap) + ' to ' + fmt$(m.a13) + ')'; }).join(', ') + '.');
+    $('insights').innerHTML = li.map(function (t) { return '<li>' + t + '</li>'; }).join('');
+    $('chartSub').textContent = SEG[si] + ' · weekly volume-weighted ASP · hover a week for detail';
+  }
+
+  // ---- brand table ----
+  var bSort = { k: 'units', dir: -1 };
+  function renderBrands(si, s) {
+    var britaxRow = brands.filter(function (b) { return b.si === si && b.br === 'Britax'; })[0];
+    var bAsp = britaxRow ? britaxRow.sales / britaxRow.units : null;
+    var rows = brands.filter(function (b) { return b.si === si && b.units > 0; }).map(function (b) {
+      var asp = b.sales / b.units;
+      return { br: b.br, units: b.units, share: s.totalUnits ? b.units / s.totalUnits : null, asp: asp, a13: b.a13, ap: b.ap,
+        chg: b.a13 && b.ap ? b.a13 / b.ap - 1 : null, vs: bAsp && b.br !== 'Britax' ? asp / bAsp - 1 : null, me: b.br === 'Britax' };
+    });
+    rows.sort(function (p, q) { var x = p[bSort.k], y = q[bSort.k]; if (typeof x === 'string') return bSort.dir * x.localeCompare(y); return bSort.dir * ((x == null ? -1e18 : x) - (y == null ? -1e18 : y)); });
+    var maxA = Math.max.apply(null, rows.map(function (r) { return r.asp; }));
+    var cols = [['br', 'Brand'], ['units', 'Est. units'], ['share', 'Unit share'], ['asp', '52-wk ASP'], ['a13', 'Last 13 wks'], ['ap', 'Prior 13 wks'], ['chg', 'Change'], ['vs', 'Price vs Britax']];
+    var h = '<thead><tr>' + cols.map(function (c) { return '<th><button data-k="' + c[0] + '">' + c[1] + (bSort.k === c[0] ? (bSort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>'; }).join('') + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      h += '<tr class="' + (r.me ? 'me' : '') + '"><td>' + esc(r.br) + (r.br === 'Bob Gear' ? ' <span style="color:var(--muted);font-weight:400">(also Britax-owned)</span>' : '') + '</td><td>' + fmtN(r.units) + '</td><td>' + (r.share == null ? '—' : (r.share * 100).toFixed(1) + '%') +
+        '</td><td><span class="bar" style="width:' + Math.round(r.asp / maxA * 90) + 'px"></span>' + fmt$(r.asp) + '</td><td>' + fmt$(r.a13) + '</td><td>' + fmt$(r.ap) + '</td><td class="' + '' + '">' + pct(r.chg) + '</td><td>' + pct(r.vs, 0) + '</td></tr>';
+    });
+    $('brandTbl').innerHTML = rows.length ? h + '</tbody>' : '<tbody><tr><td class="empty">No brand data for this segment.</td></tr></tbody>';
+    Array.prototype.forEach.call($('brandTbl').querySelectorAll('th button'), function (b) {
+      b.onclick = function () { var k = b.getAttribute('data-k'); bSort = { k: k, dir: bSort.k === k ? -bSort.dir : (k === 'br' ? 1 : -1) }; renderBrands(cur, segStats(cur)); };
+    });
+  }
+
+  // ---- SKU table ----
+  var sSort = { k: 'sales', dir: -1 }, segCache = SEG.map(function (_, i) { return segStats(i); });
+  function skuRows() {
+    var q = $('q').value.trim().toLowerCase(), all = $('allSeg').checked;
+    return skus.filter(function (k) { return (all || k.si === cur) && (!q || k.asin.toLowerCase().indexOf(q) >= 0 || k.title.toLowerCase().indexOf(q) >= 0); }).map(function (k) {
+      var asp = k.sales / k.units, c = segCache[k.si].cAsp;
+      return { asin: k.asin, title: k.title, seg: SEG[k.si], sales: k.sales, units: k.units, asp: asp, a13: k.a13, chg: k.a13 && k.ap ? k.a13 / k.ap - 1 : null, lo: k.lo, hi: k.hi, idx: c ? asp / c * 100 : null, wks: k.wks };
+    }).sort(function (p, q) { var x = p[sSort.k], y = q[sSort.k]; if (typeof x === 'string') return sSort.dir * x.localeCompare(y); return sSort.dir * ((x == null ? -1e18 : x) - (y == null ? -1e18 : y)); });
+  }
+  function renderSkus() {
+    var rows = skuRows();
+    var cols = [['asin', 'ASIN'], ['title', 'Product'], ['seg', 'Segment'], ['sales', 'Est. sales'], ['units', 'Est. units'], ['asp', '52-wk ASP'], ['a13', 'Last 13 wks'], ['chg', 'Change'], ['lo', 'Weekly low'], ['hi', 'Weekly high'], ['idx', 'Index vs segment']];
+    var h = '<thead><tr>' + cols.map(function (c) { return '<th><button data-k="' + c[0] + '">' + c[1] + (sSort.k === c[0] ? (sSort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>'; }).join('') + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      h += '<tr><td class="l"><a href="https://www.amazon.com/dp/' + r.asin + '" target="_blank" rel="noopener">' + r.asin + '</a></td><td class="l title" title="' + esc(r.title) + '">' + esc(r.title) + '</td><td class="l">' + esc(r.seg) + '</td><td>' + fmt$(r.sales) + '</td><td>' + fmtN(r.units) + '</td><td>' + fmt$(r.asp) + '</td><td>' + fmt$(r.a13) + '</td><td class="' + '' + '">' + pct(r.chg) + '</td><td>' + fmt$(r.lo) + '</td><td>' + fmt$(r.hi) + '</td><td>' + (r.idx == null ? '—' : Math.round(r.idx)) + '</td></tr>';
+    });
+    $('skuTbl').innerHTML = rows.length ? h + '</tbody>' : '<tbody><tr><td class="empty">No Britax SKUs in the top 40 for this segment. Tick "Show all segments".</td></tr></tbody>';
+    Array.prototype.forEach.call($('skuTbl').querySelectorAll('th button'), function (b) {
+      b.onclick = function () { var k = b.getAttribute('data-k'); sSort = { k: k, dir: sSort.k === k ? -sSort.dir : (['asin', 'title', 'seg'].indexOf(k) >= 0 ? 1 : -1) }; renderSkus(); };
+    });
+  }
+  $('q').oninput = renderSkus; $('allSeg').onchange = renderSkus;
+  $('csv').onclick = function () {
+    var rows = skuRows(), head = ['ASIN', 'Product', 'Segment', 'Est. sales ($)', 'Est. units', '52-wk ASP', 'Last 13 wks ASP', 'Change vs prior 13 wks', 'Weekly low', 'Weekly high', 'Index vs segment'];
+    var csv = [head].concat(rows.map(function (r) { return [r.asin, r.title, r.seg, Math.round(r.sales), Math.round(r.units), r.asp.toFixed(2), r.a13 == null ? '' : r.a13, r.chg == null ? '' : (r.chg * 100).toFixed(1) + '%', r.lo, r.hi, r.idx == null ? '' : Math.round(r.idx)]; }))
+      .map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'britax-us-sku-pricing.csv'; a.click();
+  };
+
+  function render() {
+    Array.prototype.forEach.call(tabs.children, function (b, i) { b.setAttribute('aria-selected', i === cur ? 'true' : 'false'); });
+    var s = segCache[cur];
+    renderTiles(s); renderChart(cur); renderInsights(cur, s); renderBrands(cur, s); renderSkus();
+  }
+  var rz; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { renderChart(cur); }, 120); });
+  render();
+})();
+</script>
+</body>
+</html>
