@@ -1,8 +1,8 @@
 import fs from 'node:fs'; import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const A = require('../private/analytics.js');
-const w = {}; for (const f of ['weekly','basket','tariff','events','moves','ladder']) new Function('window', fs.readFileSync(new URL(`../private/data-${f}.js`, import.meta.url), 'utf8'))(w);
-const M = A.parse({ weekly: w.BRITAX_WEEKLY, basket: w.BRITAX_BASKET, tariff: w.BRITAX_TARIFF, events: w.BRITAX_EVENTS, moves: w.BRITAX_MOVES, ladder: w.BRITAX_LADDER });
+const w = {}; for (const f of ['weekly','basket','tariff','events','moves','ladder','promo']) new Function('window', fs.readFileSync(new URL(`../private/data-${f}.js`, import.meta.url), 'utf8'))(w);
+const M = A.parse({ weekly: w.BRITAX_WEEKLY, basket: w.BRITAX_BASKET, tariff: w.BRITAX_TARIFF, events: w.BRITAX_EVENTS, moves: w.BRITAX_MOVES, ladder: w.BRITAX_LADDER, promo: w.BRITAX_PROMO, psku: w.BRITAX_PSKU, pweek: w.BRITAX_PWEEK });
 const f = A.fmt1;
 for (let si = 0; si < 6; si++) {
   const s = A.segmentSummary(M, si), st = A.stability(M, si), fl = A.flagStatus(M, si), L = A.ladderRows(M, si);

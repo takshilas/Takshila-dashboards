@@ -4,13 +4,14 @@
   var W = 106;
   var FIRST = Date.UTC(2024, 9, 6); // week 0 starts 2024-10-06 (Sunday)
   var SEGMENTS = ['Convertible car seats', 'Booster car seats', 'Infant car seats', 'Strollers (other)', 'Double strollers', 'Travel systems'];
-  // Promotional periods (customer definition): June and October Prime events. 2025 had no June event, so Prime Day July 2025 stands in for it.
+  // Promotional periods: October Prime Big Deal Days only (customer definition). dataId points at the matching rows in data-events.js.
   var EVENTS = [
-    { id: 0, week: 39, label: 'Prime Day Jul 2025', short: 'Jul-25', note: 'There was no June Prime Day in 2025, so the July event is used. Its price changes also include tariff increases made in the 10 weeks before it' },
-    { id: 1, week: 52, label: 'Prime Big Deal Days Oct 2025', short: 'Oct-25' },
-    { id: 2, week: 89, label: 'Prime Day Jun 2026', short: 'Jun-26' },
-    { id: 3, week: 104, label: 'Prime Big Deal Days Oct 2026', short: 'Oct-26', note: 'Only the first week after the event exists, so "after" here is that one week and is provisional' }
+    { id: 0, week: 52, dataId: 1, label: 'Prime Big Deal Days Oct 2025', short: 'Oct-25' },
+    { id: 1, week: 104, dataId: 3, label: 'Prime Big Deal Days Oct 2026', short: 'Oct-26', note: 'Only the first week after the event exists, so "after" is that one week and is provisional' }
   ];
+  // Other Prime weeks (Jul 2025, Jun 2026) are not promotional periods here. They are still kept out of the price-move series because they distort prices.
+  var OTHER_PRIME = [{ week: 39, short: 'Jul-25' }, { week: 89, short: 'Jun-26' }];
+  var ALL_PRIME_WEEKS = [39, 52, 89, 104];
   // Other deal weeks the model keeps out of the "outside promotional periods" list.
   var OTHER_EVENT_WEEKS = [0, 1, 6, 7, 8, 59, 60];
   var DEAL_PERIODS = [[19, 22], [70, 76]]; // Feb-Mar 2025 and Feb-Mar 2026: market units 20-40% above normal
@@ -22,7 +23,7 @@
   function wkLabel(i) { return wkDate(i).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }); }
   function monthLabel(i) { return wkDate(i).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }); }
   function nums(s) { return s.split(',').map(function (x) { return x === '' ? null : Number(x); }); }
-  function isPrimeEventWeek(w) { return EVENTS.some(function (e) { return w >= e.week - 2 && w <= e.week + 1; }); }
+  function isPrimeEventWeek(w) { return ALL_PRIME_WEEKS.some(function (e) { return w >= e - 2 && w <= e + 1; }); }
   function inDeal(w) { return DEAL_PERIODS.some(function (d) { return w >= d[0] && w <= d[1]; }); }
   function inTariff(w) { return w >= TARIFF_WINDOW[0] && w <= TARIFF_WINDOW[1]; }
   function sumRange(a, lo, hi) { var t = 0; for (var i = lo; i <= hi; i++) if (a[i] != null) t += a[i]; return t; }
@@ -31,7 +32,7 @@
   function median(a) { var s = a.filter(function (x) { return x != null && isFinite(x); }).sort(function (x, y) { return x - y; }); if (!s.length) return null; var m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 
   function parse(D) {
-    var out = { weekly: [], basket: {}, tariff: [], events: [], moves: [], ladder: [] };
+    var out = { weekly: [], basket: {}, tariff: [], events: [], moves: [], ladder: [], promo: [], psku: [], pweek: [] };
     D.weekly.forEach(function (r) {
       var p = r.split('|'), si = +p[0];
       out.weekly[si] = { ab: nums(p[1]), ac: nums(p[2]), ub: nums(p[3]), uc: nums(p[4]) };
@@ -59,6 +60,18 @@
       if (p[1] === 'MKT') out.ladder.push({ si: +p[0], mkt: true, p25: v[0], p50: v[1], p75: v[2], belowBritax: v[3] });
       else out.ladder.push({ si: +p[0], brand: p[1], asp: v[0], units: v[1], aspLY: v[2], unitsLY: v[3], aspPrior: v[4], unitsPrior: v[5] });
     });
+    (D.promo || []).forEach(function (r) {
+      var p = r.split('|'), n = function (v) { return v === '' ? null : +v; };
+      var per = [3, 4, 5].map(function (i) { var v = p[i].split(','); return { u: +v[0], cov: n(v[1]), idx: n(v[2]), pu: n(v[3]), dp: n(v[4]), ps: n(v[5]) }; });
+      out.promo.push({ si: +p[0], ev: +p[1], brand: p[2], per: per });
+    });
+    (D.psku || []).forEach(function (r) {
+      var p = r.split('|'), v = p[6].split(',').map(function (x) { return x === '' ? null : +x; });
+      out.psku.push({ si: +p[0], ev: +p[1], own: p[2] === 'B', asin: p[3], brand: p[4], title: p[5], base: v[0], p0: v[1], p1: v[2], p2: v[3], u0: v[4], u1: v[5], u2: v[6] });
+    });
+    (D.pweek || []).forEach(function (r) {
+      var p = r.split('|'); out.pweek.push({ si: +p[0], ev: +p[1], own: p[2] === 'B', idx: nums(p[3]), pu: nums(p[4]), un: nums(p[5]) });
+    });
     return out;
   }
 
@@ -79,9 +92,9 @@
     var tc = tAll.filter(function (t) { return t.brand === 'All competitors'; })[0], tb = tAll.filter(function (t) { return t.brand === 'Britax group'; })[0];
     var evB = [], evC = [];
     EVENTS.forEach(function (e) {
-      var b = M.events.filter(function (r) { return r.si === si && r.ev === e.id && r.brand === 'Britax group'; })[0];
-      var c = M.events.filter(function (r) { return r.si === si && r.ev === e.id && r.brand === 'All competitors'; })[0];
-      var t = M.events.filter(function (r) { return r.si === si && r.ev === e.id && r.brand === 'Segment total'; })[0];
+      var b = M.events.filter(function (r) { return r.si === si && r.ev === e.dataId && r.brand === 'Britax group'; })[0];
+      var c = M.events.filter(function (r) { return r.si === si && r.ev === e.dataId && r.brand === 'All competitors'; })[0];
+      var t = M.events.filter(function (r) { return r.si === si && r.ev === e.dataId && r.brand === 'Segment total'; })[0];
       var aft = function (r) { return r.p24 != null ? r.p24 : r.p1; }, aftT = function (r) { return r.p24 != null ? r.p24 : r.p1; };
       evB.push({ ev: e.id, liftX: b.event / b.lead, retain: aft(b) / b.lead, pxE: b.pxE, pxP: b.pxP != null ? b.pxP : b.pxA, shLead: b.lead / t.lead * 100, shEv: b.event / t.event * 100, shPost: aft(b) / aftT(t) * 100, lead: b.lead });
       evC.push({ ev: e.id, liftX: c.event / c.lead, retain: aft(c) / c.lead, pxE: c.pxE, pxP: c.pxP != null ? c.pxP : c.pxA });
@@ -212,23 +225,38 @@
       stabilised: lvl && lvl.w13 != null && Math.abs(lvl.w13 - 100) < 3 && (totalU ? calmU / totalU : 0) >= 0.6, vol60: volN2 };
   }
 
-  // Post-promo performance for one event and segment. 'After' = weeks 2-4 after the event (the week right after is shown separately, it is still event-affected).
-  // For the Oct 2026 event only that first week exists, so 'after' falls back to it and is marked provisional.
-  function postPromo(M, si, ev) {
-    var rows = M.events.filter(function (r) { return r.si === si && r.ev === ev; });
+  // October Prime events against the 52-week baseline: one row per brand with before / during / after share, price vs baseline and promotion depth.
+  function promoBrands(M, si, ev) {
+    var rows = M.promo.filter(function (r) { return r.si === si && r.ev === ev; });
     var tot = rows.filter(function (r) { return r.brand === 'Segment total'; })[0];
-    var prov = tot.p24 == null, aft = function (r) { return prov ? r.p1 : r.p24; };
+    var prov = ev === 1;
     return rows.filter(function (r) { return r.brand !== 'Segment total'; }).map(function (r) {
-      var shLead = r.lead / tot.lead * 100, shEv = r.event / tot.event * 100, shPost = aft(r) / aft(tot) * 100;
-      var pxAfter = prov ? r.pxA : r.pxP, reaction = [];
-      if (r.pxE != null && r.pxE <= 94) reaction.push('Cut price ' + fmt1(100 - r.pxE) + '% for the event');
-      if (pxAfter != null && r.pxE != null && pxAfter - r.pxE >= 4) reaction.push('Took ' + fmt1(pxAfter - r.pxE) + ' pts back after');
-      if (pxAfter != null && pxAfter <= 94) reaction.push('Still ' + fmt1(100 - pxAfter) + '% below lead-in price after');
-      if (pxAfter != null && pxAfter >= 106) reaction.push('Priced ' + fmt1(pxAfter - 100) + '% above lead-in after');
-      return { brand: r.brand, isBritax: r.brand === 'Britax group', isAll: r.brand === 'All competitors', lead: r.lead, event: r.event, p1: r.p1, p24: r.p24, after: aft(r), provisional: prov,
-        liftX: r.event / r.lead, retain: aft(r) / r.lead, shLead: shLead, shEv: shEv, shPost: shPost, dShare: shPost - shLead,
-        pxE: r.pxE, pxA: r.pxA, pxP: prov ? null : r.pxP, pxAfter: pxAfter, reaction: reaction, thin: r.lead < 40 };
-    }).sort(function (a, b) { return (a.isAll ? 1 : 0) - (b.isAll ? 1 : 0) || b.lead - a.lead; });
+      var sh = r.per.map(function (p, k) { return p.u / tot.per[k].u * 100; });
+      return { brand: r.brand, isBritax: r.brand === 'Britax group', isAll: r.brand === 'All competitors', per: r.per, sh: sh, dShare: sh[2] - sh[0], lift: r.per[1].u / r.per[0].u, retain: r.per[2].u / r.per[0].u,
+        thin: r.per[0].u < 40, provisional: prov };
+    }).sort(function (a, b) { return (a.isAll ? 1 : 0) - (b.isAll ? 1 : 0) || b.per[0].u - a.per[0].u; });
+  }
+  // Weekly price index vs baseline and % of units on promotion, event-6 .. event+3, as arrays indexed by absolute week.
+  function promoWeekly(M, si, ev, own) {
+    var r = M.pweek.filter(function (x) { return x.si === si && x.ev === ev && x.own === own; })[0], e = EVENTS[ev].week;
+    var idx = [], pu = [];
+    if (r) for (var k = 0; k < 10; k++) { var w = e - 6 + k; if (w <= W - 1) { idx[w] = r.idx[k]; pu[w] = r.pu[k] == null ? null : r.pu[k]; } }
+    // a week with no baseline coverage has no promo share either
+    for (var i in idx) if (idx[i] == null) pu[i] = null;
+    return { idx: idx, pu: pu, lo: Math.max(0, e - 6), hi: Math.min(W - 1, e + 3) };
+  }
+  // SKU-level promotion status: before / during / after vs the SKU's own 52-week baseline price.
+  function promoSkus(M, si, ev, own) {
+    return M.psku.filter(function (r) { return r.si === si && r.ev === ev && r.own === own; }).map(function (r) {
+      var d = function (p) { return p == null || !r.base ? null : (p / r.base - 1) * 100; };
+      var d0 = d(r.p0), d1 = d(r.p1), d2 = d(r.p2), flags = [];
+      if (d0 != null && d0 <= -5) flags.push('Early deal');
+      if (d1 != null && d1 <= -5) flags.push('On promo in event');
+      if (d2 != null && d2 <= -5) flags.push('Promo continues after');
+      if (d1 != null && d1 > -5 && d1 < 5) flags.push('At baseline in event');
+      if (d1 != null && d1 >= 5) flags.push('Above baseline in event');
+      return { asin: r.asin, brand: r.brand, title: r.title, base: r.base, p0: r.p0, p1: r.p1, p2: r.p2, d0: d0, d1: d1, d2: d2, u0: r.u0, u1: r.u1, u2: r.u2, lift: r.u0 ? r.u1 / r.u0 : null, flags: flags, onPromo: d1 != null && d1 <= -5 };
+    }).sort(function (a, b) { return (b.u1 || 0) - (a.u1 || 0); });
   }
 
   // Price ladder for one segment: brand ASPs, market quartiles, Britax position.
@@ -253,7 +281,7 @@
     OTHER_EVENT_WEEKS: OTHER_EVENT_WEEKS, DEAL_PERIODS: DEAL_PERIODS,
     wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, isPrimeEventWeek: isPrimeEventWeek, inDeal: inDeal, fmt1: fmt1,
     parse: parse, segmentSummary: segmentSummary, tariffRows: tariffRows, nowRows: nowRows, moveRows: moveRows, flagStatus: flagStatus, stability: stability,
-    postPromo: postPromo, ladderRows: ladderRows
+    promoBrands: promoBrands, promoWeekly: promoWeekly, promoSkus: promoSkus, ladderRows: ladderRows, OTHER_PRIME: OTHER_PRIME
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.BritaxAnalytics = api;
 })(typeof window !== 'undefined' ? window : this);

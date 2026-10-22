@@ -44,3 +44,10 @@ SELECT 1;
 --    All five equal the figures on the page.
 --  * the price ladder table (78 rows) was checked by structure only.
 -- Earlier check (Britax brand only, excluding Bob Gear; 52 weeks to Oct 2026; not repeated for the Britax group): estimated sales $27.66M vs Vendor Central ordered revenue $35.71M (77%), estimated ASP $233.65 vs $253.2.
+
+-- October Prime before / during / after (data-promo.js), queries G (brand x period), H (top SKUs), I (weekly):
+--  baseline = percentile(price, 0.5) per ASIN over weeks 54..105 (2025-10-19 to 2026-10-11), ASINs with >= 10 weeks of >= 2 units;
+--  promotion = SKU-week price <= 0.95 x baseline (rows with >= 2 units, price within 0.5x-2x of baseline);
+--  periods: before = e-3..e-1, during = e, after = e+1..e+3 (week 105 only for the Oct 2026 event e = 104; Oct 2025 is e = 52).
+--  price vs baseline = SUM(sales) / SUM(baseline price x units) over covered units; units on promotion and depth are unit-weighted.
+--  Checksums (npm run verify): brand table sums per period, weekly series sums, and per segment x event SKU sums match the SQL.
