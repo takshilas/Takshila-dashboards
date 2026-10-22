@@ -27,27 +27,20 @@ SELECT 1;
 -- B) Weekly fixed-basket index (data-basket.js). Basket = ASINs with >= 8 baseline units; week index = SUM(price_t * baseline units) / SUM(baseline price * baseline units)
 --    over basket ASINs with >= 2 units that week; blank when matched revenue < 40% of the basket. Rise start = first clean week from 17 where the
 --    index and the next two are >= 1.04 x the Jan-25 level (1.08 for the second column).
--- C) Weekly implied ASP and units for Britax group vs all competitors per segment (data-weekly.js).
--- D) Events (data-events.js): lead-in = weeks e-10..e-7 (clear of early deals and Britax's own Memorial Day / Labor Day pricing), event = e, week after = e+1, weeks 2-4 after = e+2..e+4
---    (blank for the Oct-26 event). Units per week, and same-ASIN price vs lead-in for event, week after and weeks 2-4.
--- E) Price ladder (data-ladder.js): brand ASP and units/week for now, a year ago and prior; unit-weighted p25/p50/p75 of ASIN prices; share of units priced below Britax.
--- F) Sustained moves (data-moves.js): on the clean series, avg(next 4 weeks) vs avg(prior 4 weeks), |change| >= 5%, largest within +-3 weeks,
---    kept if the level 4-7 weeks later is the same sign and >= 60% of the move (or if there are not 2 clean weeks left to check).
+-- C) 12-month series (data-r12.js, weeks 54..105 = 2025-10-19 to 2026-10-11): per segment x brand (Britax group, All competitors, Segment total, top competitors):
+--    price index vs baseline, % of units sold on promotion, and units, by week.
+--    baseline = percentile(price, 0.5) per ASIN over weeks 54..105, ASINs with >= 10 weeks of >= 2 units;
+--    promotion = SKU-week price <= 0.95 x baseline (rows with >= 2 units, price within 0.5x-2x of baseline);
+--    index = SUM(sales) / SUM(baseline price x units) over covered units x 100. Rows are printed with array_join(array(...), ',', '') so NULLs stay empty.
+--
+-- D) Key products (data-skus.js): top Britax and competitor ASINs by units over weeks 93..105 in segments 0, 1, 3, 4 (convertible, booster, other strollers, double strollers),
+--    with ASIN, brand, title (COALESCE(title, '(title not available)')), baseline price, units per week and the 52 weekly prices. ORDER BY ..., asin for a stable order.
+--
+-- Stitching, move detection, stability, promotion and share statistics are computed in the browser from these tables (private/analytics.js).
+--   moves: avg(next 4 clean weeks) vs avg(prior 4 clean weeks) >= 5%, largest within +-3 weeks, kept if the level 4-7 weeks later has the same sign and >= 60% of the move.
+--   clean weeks exclude Prime event weeks (e-2..e+1), Black Friday weeks (6, 7, 8, 59, 60) and weeks 0-1.
 
--- Validation used when building (all re-run after the final data was written):
---  * weekly and basket series carry a checksum printed by the query and re-checked by scripts/verify-*.mjs (npm run verify);
---  * events: row count, unit-column sums and the sums of the rounded price columns match the SQL (216 rows);
---  * tariff: 72 rows, baseline units 154,192, sums of the Jun-vs-Jan, now-vs-baseline, 11-vs-11 and year-ago indices (8019.4 / 7523.9 / 6914.0 / 6857.7) match the SQL;
---  * moves: 178 rows, sum of weeks 9,020, sum of changes 1,069.0%, 104 confirmed match the SQL;
---  * independent recompute, written as separate SQL (per-ASIN window self-joins, not the conditional sums above): Britax convertible unit share 2.9% (wk 91-101),
---    3.6% (wk 41-49), 3.0% (wk 76-86); all-competitor convertible same-ASIN change Jan to Jun 2025 +14.2%; Britax convertible same-ASIN year over year +9.8%.
---    All five equal the figures on the page.
---  * the price ladder table (78 rows) was checked by structure only.
--- Earlier check (Britax brand only, excluding Bob Gear; 52 weeks to Oct 2026; not repeated for the Britax group): estimated sales $27.66M vs Vendor Central ordered revenue $35.71M (77%), estimated ASP $233.65 vs $253.2.
-
--- October Prime before / during / after (data-promo.js), queries G (brand x period), H (top SKUs), I (weekly):
---  baseline = percentile(price, 0.5) per ASIN over weeks 54..105 (2025-10-19 to 2026-10-11), ASINs with >= 10 weeks of >= 2 units;
---  promotion = SKU-week price <= 0.95 x baseline (rows with >= 2 units, price within 0.5x-2x of baseline);
---  periods: before = e-3..e-1, during = e, after = e+1..e+3 (week 105 only for the Oct 2026 event e = 104; Oct 2025 is e = 52).
---  price vs baseline = SUM(sales) / SUM(baseline price x units) over covered units; units on promotion and depth are unit-weighted.
---  Checksums (npm run verify): brand table sums per period, weekly series sums, and per segment x event SKU sums match the SQL.
+-- Validation: every table row carries a checksum printed by its query and re-checked by scripts/verify-*.mjs (npm run verify):
+--  * basket 42 rows, 12-month series 48 rows, key products 76 rows; tariff 72 rows checked against the SQL sums at build time.
+--  * independent recompute as separate SQL: Britax convertible unit share 2.9% (wk 91-101); all-competitor convertible same-ASIN change Jan to Jun 2025 +14.2%.
+-- Earlier check (Britax brand only, excluding Bob Gear; 52 weeks to Oct 2026): estimated sales $27.66M vs Vendor Central ordered revenue $35.71M (77%), estimated ASP $233.65 vs $253.2.

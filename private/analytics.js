@@ -3,285 +3,177 @@
 (function (root) {
   var W = 106;
   var FIRST = Date.UTC(2024, 9, 6); // week 0 starts 2024-10-06 (Sunday)
+  var R12_START = 54;               // first week of the 12-month tables (2025-10-19)
   var SEGMENTS = ['Convertible car seats', 'Booster car seats', 'Infant car seats', 'Strollers (other)', 'Double strollers', 'Travel systems'];
-  // Promotional periods: October Prime Big Deal Days only (customer definition). dataId points at the matching rows in data-events.js.
-  var EVENTS = [
-    { id: 0, week: 52, dataId: 1, label: 'Prime Big Deal Days Oct 2025', short: 'Oct-25' },
-    { id: 1, week: 104, dataId: 3, label: 'Prime Big Deal Days Oct 2026', short: 'Oct-26', note: 'Only the first week after the event exists, so "after" is that one week and is provisional' }
+  var CORE = [0, 1, 3, 4]; // Britax's top 20% of categories: 4 of 20, about 85% of Britax sales
+  // June and October Prime events. 2025 had no June event, so Prime Day in July 2025 is used.
+  var PRIME = [
+    { week: 39, short: 'Jul-25', label: 'Prime Day Jul 2025 (no June event in 2025)' },
+    { week: 52, short: 'Oct-25', label: 'Prime Big Deal Days Oct 2025' },
+    { week: 89, short: 'Jun-26', label: 'Prime Day Jun 2026' },
+    { week: 104, short: 'Oct-26', label: 'Prime Big Deal Days Oct 2026' }
   ];
-  // Other Prime weeks (Jul 2025, Jun 2026) are not promotional periods here. They are still kept out of the price-move series because they distort prices.
-  var OTHER_PRIME = [{ week: 39, short: 'Jul-25' }, { week: 89, short: 'Jun-26' }];
-  var ALL_PRIME_WEEKS = [39, 52, 89, 104];
-  // Other deal weeks the model keeps out of the "outside promotional periods" list.
-  var OTHER_EVENT_WEEKS = [0, 1, 6, 7, 8, 59, 60];
-  var DEAL_PERIODS = [[19, 22], [70, 76]]; // Feb-Mar 2025 and Feb-Mar 2026: market units 20-40% above normal
-  var TARIFF_WINDOW = [13, 38]; // Jan to Jun 2025
-  var CLEAN_NOW = [91, 101], CLEAN_PRIOR = [76, 86], CLEAN_LY = [41, 49];
+  var TARIFF = [13, 38]; // Jan to Jun 2025
+  var BLACK_FRIDAY = [6, 7, 8, 59, 60];
 
   function wkDate(i) { return new Date(FIRST + i * 7 * 864e5); }
   function wkIso(i) { return wkDate(i).toISOString().slice(0, 10); }
   function wkLabel(i) { return wkDate(i).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }); }
   function monthLabel(i) { return wkDate(i).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }); }
   function nums(s) { return s.split(',').map(function (x) { return x === '' ? null : Number(x); }); }
-  function isPrimeEventWeek(w) { return ALL_PRIME_WEEKS.some(function (e) { return w >= e - 2 && w <= e + 1; }); }
-  function inDeal(w) { return DEAL_PERIODS.some(function (d) { return w >= d[0] && w <= d[1]; }); }
-  function inTariff(w) { return w >= TARIFF_WINDOW[0] && w <= TARIFF_WINDOW[1]; }
-  function sumRange(a, lo, hi) { var t = 0; for (var i = lo; i <= hi; i++) if (a[i] != null) t += a[i]; return t; }
-  function wavg(asp, units, lo, hi) { var s = 0, u = 0; for (var i = lo; i <= hi; i++) if (asp[i] != null && units[i] != null) { s += asp[i] * units[i]; u += units[i]; } return u ? s / u : null; }
-  function pct(a, b) { return a == null || b == null || b === 0 ? null : (a / b - 1) * 100; }
+  // Weeks distorted by a Prime event: two weeks of early deals before it, the event, the week after.
+  function primeWeek(w) { return PRIME.some(function (e) { return w >= e.week - 2 && w <= e.week + 1; }); }
+  function excluded(w) { return primeWeek(w) || BLACK_FRIDAY.indexOf(w) >= 0 || w <= 1; }
+  function avg(a) { var s = 0, n = 0; a.forEach(function (x) { if (x != null) { s += x; n++; } }); return n ? s / n : null; }
+  function cnt(a) { return a.filter(function (x) { return x != null; }).length; }
+  function slice(a, lo, hi) { return a.slice(lo, hi + 1); }
   function median(a) { var s = a.filter(function (x) { return x != null && isFinite(x); }).sort(function (x, y) { return x - y; }); if (!s.length) return null; var m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function sd(a) { var v = a.filter(function (x) { return x != null; }); if (v.length < 4) return null; var m = avg(v); return Math.sqrt(v.reduce(function (s, x) { return s + (x - m) * (x - m); }, 0) / (v.length - 1)); }
+  function f1(v) { return v == null || !isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1); }
 
   function parse(D) {
-    var out = { weekly: [], basket: {}, tariff: [], events: [], moves: [], ladder: [], promo: [], psku: [], pweek: [] };
-    D.weekly.forEach(function (r) {
-      var p = r.split('|'), si = +p[0];
-      out.weekly[si] = { ab: nums(p[1]), ac: nums(p[2]), ub: nums(p[3]), uc: nums(p[4]) };
-    });
-    D.basket.forEach(function (r) {
-      var p = r.split('|'), si = +p[0];
-      (out.basket[si] = out.basket[si] || {})[p[1]] = { r4: p[2] === '' ? null : +p[2], r8: p[3] === '' ? null : +p[3], jan: +p[4], idx: nums(p[5]) };
-    });
+    var out = { basket: {}, tariff: [], r12: {}, skus: [] };
+    D.basket.forEach(function (r) { var p = r.split('|'); (out.basket[+p[0]] = out.basket[+p[0]] || {})[p[1]] = { idx: nums(p[5]) }; });
     D.tariff.forEach(function (r) {
       var p = r.split('|'), v = p[3].split(',').map(function (x) { return x === '' ? null : Number(x); });
-      out.tariff.push({ si: +p[0], brand: p[1], bu: +p[2], jan: v[0], janCov: v[1], jun: v[2], junCov: v[3], jj: v[4], jjCov: v[5], now: v[6], nowCov: v[7],
-        w13: v[8], w13Cov: v[9], w4: v[10], w4Cov: v[11], yy: v[12], yyCov: v[13], r4: p[4] === '' ? null : +p[4], r8: p[5] === '' ? null : +p[5] });
+      out.tariff.push({ si: +p[0], brand: p[1], bu: +p[2], jj: v[4], jjCov: v[5], start: p[4] === '' ? null : +p[4] });
     });
-    D.events.forEach(function (r) {
-      if (r.indexOf('CK|') === 0) return;
-      var p = r.split('|'), u = p[3].split(','), x = p[4].split(','), n = function (v) { return v === '' ? null : +v; };
-      out.events.push({ si: +p[0], ev: +p[1], brand: p[2], lead: +u[0], event: +u[1], p1: n(u[2]), p24: n(u[3]), pxE: n(x[0]), pxA: n(x[1]), pxP: n(x[2]) });
+    D.r12.forEach(function (r) {
+      var p = r.split('|'), place = function (s) { var a = [], v = nums(s); for (var i = 0; i < 52; i++) a[R12_START + i] = v[i]; return a; };
+      (out.r12[+p[0]] = out.r12[+p[0]] || {})[p[1]] = { idx: place(p[2]), pu: place(p[3]), un: place(p[4]) };
     });
-    D.moves.forEach(function (r) {
-      var p = r.split('|');
-      out.moves.push({ si: +p[0], brand: p[1], week: +p[2], chg: +p[3], confirmed: p[4] === 'P' });
-    });
-    D.ladder.forEach(function (r) {
-      var p = r.split('|'), v = p[2].split(',').map(function (x) { return x === '' ? null : Number(x); });
-      if (p[1] === 'MKT') out.ladder.push({ si: +p[0], mkt: true, p25: v[0], p50: v[1], p75: v[2], belowBritax: v[3] });
-      else out.ladder.push({ si: +p[0], brand: p[1], asp: v[0], units: v[1], aspLY: v[2], unitsLY: v[3], aspPrior: v[4], unitsPrior: v[5] });
-    });
-    (D.promo || []).forEach(function (r) {
-      var p = r.split('|'), n = function (v) { return v === '' ? null : +v; };
-      var per = [3, 4, 5].map(function (i) { var v = p[i].split(','); return { u: +v[0], cov: n(v[1]), idx: n(v[2]), pu: n(v[3]), dp: n(v[4]), ps: n(v[5]) }; });
-      out.promo.push({ si: +p[0], ev: +p[1], brand: p[2], per: per });
-    });
-    (D.psku || []).forEach(function (r) {
-      var p = r.split('|'), v = p[6].split(',').map(function (x) { return x === '' ? null : +x; });
-      out.psku.push({ si: +p[0], ev: +p[1], own: p[2] === 'B', asin: p[3], brand: p[4], title: p[5], base: v[0], p0: v[1], p1: v[2], p2: v[3], u0: v[4], u1: v[5], u2: v[6] });
-    });
-    (D.pweek || []).forEach(function (r) {
-      var p = r.split('|'); out.pweek.push({ si: +p[0], ev: +p[1], own: p[2] === 'B', idx: nums(p[3]), pu: nums(p[4]), un: nums(p[5]) });
+    D.skus.forEach(function (r) {
+      var p = r.split('|'), b = p[5].split(','), pr = []; nums(p[6]).forEach(function (v, i) { pr[R12_START + i] = v; });
+      out.skus.push({ si: +p[0], own: p[1] === 'B', asin: p[2], brand: p[3], title: p[4].trim(), base: +b[0], u13: +b[1], price: pr });
     });
     return out;
   }
 
-  // Britax vs competitors in one segment: price position, share trend, event response.
-  function segmentSummary(M, si) {
-    var w = M.weekly[si];
-    var bNow = wavg(w.ab, w.ub, CLEAN_NOW[0], CLEAN_NOW[1]), cNow = wavg(w.ac, w.uc, CLEAN_NOW[0], CLEAN_NOW[1]);
-    var bPrior = wavg(w.ab, w.ub, CLEAN_PRIOR[0], CLEAN_PRIOR[1]), cPrior = wavg(w.ac, w.uc, CLEAN_PRIOR[0], CLEAN_PRIOR[1]);
-    var bLY = wavg(w.ab, w.ub, CLEAN_LY[0], CLEAN_LY[1]), cLY = wavg(w.ac, w.uc, CLEAN_LY[0], CLEAN_LY[1]);
-    function share(lo, hi) {
-      var b = sumRange(w.ub, lo, hi), c = sumRange(w.uc, lo, hi);
-      var sb = 0, sc = 0;
-      for (var i = lo; i <= hi; i++) { if (w.ab[i] != null && w.ub[i] != null) sb += w.ab[i] * w.ub[i]; if (w.ac[i] != null && w.uc[i] != null) sc += w.ac[i] * w.uc[i]; }
-      return { unit: b / (b + c) * 100, dollar: sb / (sb + sc) * 100, perWeek: b / (hi - lo + 1) };
+  // One continuous price index per brand: Q4 2024 basket up to week 53, then the 12-month series rescaled to it.
+  function trendSeries(M, si, brand) {
+    var old = M.basket[si] && M.basket[si][brand], neu = M.r12[si] && M.r12[si][brand];
+    var vals = [], stitched = false, k = null;
+    if (old) for (var w = 0; w < R12_START; w++) vals[w] = old.idx[w];
+    if (old && neu) {
+      var ratios = [];
+      for (var x = R12_START; x < W; x++) if (!excluded(x) && old.idx[x] != null && neu.idx[x] != null) ratios.push(old.idx[x] / neu.idx[x]);
+      if (ratios.length >= 6) { k = median(ratios); stitched = true; for (var y = R12_START; y < W; y++) vals[y] = neu.idx[y] == null ? null : neu.idx[y] * k; }
     }
-    var shNow = share(CLEAN_NOW[0], CLEAN_NOW[1]), shPrior = share(CLEAN_PRIOR[0], CLEAN_PRIOR[1]), shLY = share(CLEAN_LY[0], CLEAN_LY[1]);
-    var tAll = M.tariff.filter(function (t) { return t.si === si; });
-    var tc = tAll.filter(function (t) { return t.brand === 'All competitors'; })[0], tb = tAll.filter(function (t) { return t.brand === 'Britax group'; })[0];
-    var evB = [], evC = [];
-    EVENTS.forEach(function (e) {
-      var b = M.events.filter(function (r) { return r.si === si && r.ev === e.dataId && r.brand === 'Britax group'; })[0];
-      var c = M.events.filter(function (r) { return r.si === si && r.ev === e.dataId && r.brand === 'All competitors'; })[0];
-      var t = M.events.filter(function (r) { return r.si === si && r.ev === e.dataId && r.brand === 'Segment total'; })[0];
-      var aft = function (r) { return r.p24 != null ? r.p24 : r.p1; }, aftT = function (r) { return r.p24 != null ? r.p24 : r.p1; };
-      evB.push({ ev: e.id, liftX: b.event / b.lead, retain: aft(b) / b.lead, pxE: b.pxE, pxP: b.pxP != null ? b.pxP : b.pxA, shLead: b.lead / t.lead * 100, shEv: b.event / t.event * 100, shPost: aft(b) / aftT(t) * 100, lead: b.lead });
-      evC.push({ ev: e.id, liftX: c.event / c.lead, retain: aft(c) / c.lead, pxE: c.pxE, pxP: c.pxP != null ? c.pxP : c.pxA });
+    return { vals: vals, stitched: stitched, k: k };
+  }
+
+  // Sustained price moves of 5% or more on weeks that are not distorted by a Prime event or Black Friday.
+  function findMoves(vals) {
+    var c = vals.map(function (v, w) { return excluded(w) ? null : v; }), out = [], cand = [];
+    function win(lo, hi) { var a = []; for (var i = lo; i <= hi; i++) a.push(i >= 0 && i < W ? c[i] : null); return a; }
+    for (var w = 5; w < W; w++) {
+      if (c[w] == null) continue;
+      var pa = win(w - 4, w - 1), na = win(w, w + 3);
+      if (cnt(pa) < 3 || cnt(na) < 3) continue;
+      var chg = avg(na) / avg(pa) - 1;
+      if (Math.abs(chg) >= 0.05) cand.push({ week: w, chg: chg });
+    }
+    cand.forEach(function (m) {
+      var best = cand.every(function (o) { return Math.abs(o.week - m.week) > 3 || Math.abs(o.chg) < Math.abs(m.chg) || (Math.abs(o.chg) === Math.abs(m.chg) && o.week >= m.week); });
+      if (!best) return;
+      var later = win(m.week + 4, m.week + 7), prior = avg(win(m.week - 4, m.week - 1)), confirmed = null;
+      if (cnt(later) >= 2) {
+        var lc = avg(later) / prior - 1;
+        if (!(lc * m.chg > 0 && Math.abs(lc) >= 0.6 * Math.abs(m.chg))) return; // transient: dropped
+        confirmed = true;
+      } else confirmed = false;
+      out.push({ week: m.week, chg: m.chg * 100, confirmed: confirmed });
     });
-    var primeIdx = []; // Britax premium over competitors' average price
-    var summary = {
-      si: si, bNow: bNow, cNow: cNow, premium: bNow && cNow ? (bNow / cNow - 1) * 100 : null,
-      premiumLY: bLY && cLY ? (bLY / cLY - 1) * 100 : null, premiumPrior: bPrior && cPrior ? (bPrior / cPrior - 1) * 100 : null,
-      bAspChg13: pct(bNow, bPrior), cAspChg13: pct(cNow, cPrior), bAspChgYY: pct(bNow, bLY), cAspChgYY: pct(cNow, cLY),
-      shNow: shNow, shPrior: shPrior, shLY: shLY,
-      dShare13: shNow.unit - shPrior.unit, dShareYY: shNow.unit - shLY.unit,
-      relShareYY: pct(shNow.unit, shLY.unit), relShare13: pct(shNow.unit, shPrior.unit),
-      compBasket13: tc && tc.w13 != null ? tc.w13 - 100 : null, britaxBasket13: tb && tb.w13 != null ? tb.w13 - 100 : null,
-      compBasketYY: tc && tc.yy != null ? tc.yy - 100 : null, britaxBasketYY: tb && tb.yy != null ? tb.yy - 100 : null,
-      compBasket4: tc && tc.w4 != null ? tc.w4 - 100 : null, britaxBasket4: tb && tb.w4 != null ? tb.w4 - 100 : null,
-      evB: evB, evC: evC,
-      britaxLift: median(evB.map(function (x) { return x.liftX; })), compLift: median(evC.map(function (x) { return x.liftX; })),
-      britaxDepth: median(evB.map(function (x) { return x.pxE != null ? 100 - x.pxE : null; })), compDepth: median(evC.map(function (x) { return x.pxE != null ? 100 - x.pxE : null; })),
-      britaxRetain: median(evB.map(function (x) { return x.retain; })), compRetain: median(evC.map(function (x) { return x.retain; })),
-      thin: tb ? tb.bu < 120 : true
-    };
-    summary.verdict = recommend(summary);
-    return summary;
+    return out;
   }
 
-  // Recommendation rule. Stated on the page so it can be challenged.
-  //  LOWER (targeted): Britax lost unit share vs a year ago by more than 8% (relative) AND competitors' same-ASIN prices are flat or lower over the
-  //    last 11 weeks (<= +1%) while Britax's are not lower than theirs by more than 2 points, i.e. the premium is not narrowing by itself.
-  //  HOLD: share is steady or growing (no more than 8% relative loss vs LY).
-  //  WATCH: share is down but competitors are raising price (they are narrowing the gap for us) or there is too little volume to tell.
-  function recommend(s) {
-    var rel = s.relShareYY, cMove = s.compBasket13, bMove = s.britaxBasket13;
-    var reasons = [];
-    if (rel == null) return { call: 'Not enough data', tone: 'neutral', reasons: ['No year-ago comparison available.'] };
-    var lost = rel < -8, gained = rel > 8;
-    var compFalling = cMove != null && cMove <= -3, compFlat = cMove != null && cMove > -3 && cMove < 3, compRising = cMove != null && cMove >= 3;
-    if (s.thin) reasons.push('Low Britax volume in this segment, so shares move on small sales.');
-    if (!lost) {
-      reasons.push('Unit share is ' + (gained ? 'up' : 'steady') + ' vs the same weeks last year (' + fmt1(s.shLY.unit) + '% to ' + fmt1(s.shNow.unit) + '%).');
-      if (compFalling) reasons.push('Competitor prices fell ' + fmt1(-cMove) + '% on the same ASINs over the last 11 weeks. Watch the gap before it costs share.');
-      return { call: compFalling ? 'Hold, watch competitors' : 'Hold', tone: compFalling ? 'watch' : 'hold', reasons: reasons };
+  // Last six months (weeks 80..105), Prime-affected weeks left out.
+  function stability(M, si, brand) {
+    var r = M.r12[si] && M.r12[si][brand]; if (!r) return null;
+    var clean = function (lo, hi) { return slice(r.idx, lo, hi).map(function (v, i) { return excluded(lo + i) ? null : v; }); };
+    var first = avg(clean(80, 85)), last = avg(clean(96, 101));
+    var all = clean(80, 105), ch = [];
+    for (var i = 1; i < all.length; i++) if (all[i] != null && all[i - 1] != null) ch.push((all[i] / all[i - 1] - 1) * 100);
+    var dips = all.filter(function (v) { return v != null && v <= 95; }).length;
+    var vals = trendSeries(M, si, brand).vals, moves = findMoves(vals).filter(function (m) { return m.week >= 80; });
+    var net = first && last ? (last / first - 1) * 100 : null, vol = sd(ch);
+    var status = net == null ? 'No read' : net >= 3 ? 'Raised' : net <= -3 ? 'Cut' : (dips >= 4 || (vol != null && vol >= 3)) ? 'Stable, promotes often' : 'Stable';
+    return { net: net, vol: vol, dips: dips, weeks: cnt(all), moves: moves, status: status };
+  }
+
+  function tariffRow(M, si, brand) {
+    var t = M.tariff.filter(function (x) { return x.si === si && x.brand === brand; })[0];
+    return t ? { rise: t.jj != null ? t.jj - 100 : null, start: t.start, cov: t.jjCov, bu: t.bu } : null;
+  }
+
+  function brands(M, si) {
+    var o = M.r12[si] || {};
+    var others = Object.keys(o).filter(function (b) { return ['Britax group', 'All competitors', 'Segment total'].indexOf(b) < 0; }).sort(function (a, b) { return unitsSum(o[b]) - unitsSum(o[a]); });
+    return ['Britax group', 'All competitors'].concat(others);
+  }
+  function unitsSum(r) { var s = 0; r.un.forEach(function (v) { if (v != null) s += v; }); return s; }
+
+  // 12-month promotion summary (baseline = each SKU's own 12-month median). Weighted by units.
+  function promoStats(M, si, brand) {
+    var r = M.r12[si] && M.r12[si][brand]; if (!r) return null;
+    var tot = { p: 0, u: 0, pp: 0, pu: 0, np: 0, nu: 0, ix: 0, pw: 0 }, primeWeeks = [];
+    PRIME.forEach(function (e) { [e.week - 1, e.week, e.week + 1].forEach(function (w) { primeWeeks.push(w); }); });
+    var promoWeeks = 0, weeks = 0, primeIdx = [];
+    for (var w = R12_START; w < W; w++) {
+      var u = r.un[w], pu = r.pu[w], ix = r.idx[w]; if (u == null || pu == null) continue;
+      var isPrime = primeWeeks.indexOf(w) >= 0;
+      tot.u += u; tot.p += pu * u; if (ix != null) tot.ix += ix * u;
+      if (isPrime) { tot.pu += u; tot.pp += pu * u; } else { tot.nu += u; tot.np += pu * u; weeks++; if (pu >= 25) promoWeeks++; }
     }
-    reasons.push('Unit share is ' + fmt1(s.shNow.unit) + '% vs ' + fmt1(s.shLY.unit) + '% a year ago (' + fmt1(rel) + '% relative).');
-    if (compRising) {
-      reasons.push('Competitors raised same-ASIN prices ' + fmt1(cMove) + '% over the last 11 weeks, so the gap is narrowing without a Britax cut.');
-      return { call: 'Hold, gap is closing', tone: 'watch', reasons: reasons };
-    }
-    if (s.thin) return { call: 'Hold, volume too thin to act', tone: 'watch', reasons: reasons };
-    reasons.push('Competitor same-ASIN prices are ' + (compFalling ? 'down ' + fmt1(-cMove) : 'flat (' + fmt1(cMove) + ')') + '% over the last 11 weeks.');
-    return { call: 'Lower selectively', tone: 'lower', reasons: reasons };
+    PRIME.forEach(function (e) { if (r.idx[e.week] != null && e.week >= R12_START) primeIdx.push({ short: e.short, idx: r.idx[e.week], pu: r.pu[e.week] }); });
+    return { all: tot.u ? tot.p / tot.u : null, prime: tot.pu ? tot.pp / tot.pu : null, normal: tot.nu ? tot.np / tot.nu : null,
+      vs: tot.u ? tot.ix / tot.u - 100 : null, promoWeeks: promoWeeks, weeks: weeks, primeIdx: primeIdx, pu: r.pu };
   }
 
-  function fmt1(v) { return v == null || !isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1); }
-
-  // Tariff table rows for one segment: how much and when each brand raised price on the same ASINs.
-  function tariffRows(M, si) {
-    return M.tariff.filter(function (t) { return t.si === si && t.brand !== 'All competitors'; }).map(function (t) {
-      var thin = t.bu < 40, lowCov = t.junCov == null || t.junCov < 60;
-      var riseVsJan = t.jj != null ? t.jj - 100 : null, riseVsQ4 = t.jun != null ? t.jun - 100 : null;
-      return { brand: t.brand, isBritax: t.brand === 'Britax group', bu: t.bu, riseQ4: riseVsQ4, riseJan: riseVsJan, cov: t.junCov, start: t.r4, start8: t.r8, thin: thin, lowCov: lowCov,
-        raised: riseVsJan != null && riseVsJan >= 4 };
-    }).sort(function (a, b) { return (b.riseJan == null ? -99 : b.riseJan) - (a.riseJan == null ? -99 : a.riseJan); });
+  // Unit share in a segment, weekly, from the 12-month tables.
+  function shareSeries(M, si, brand) {
+    var r = M.r12[si] && M.r12[si][brand], t = M.r12[si] && M.r12[si]['Segment total'], out = [];
+    if (!r || !t) return out;
+    for (var w = R12_START; w < W; w++) out[w] = r.un[w] != null && t.un[w] ? r.un[w] / t.un[w] * 100 : null;
+    return out;
+  }
+  function shareOver(M, si, brand, lo, hi) {
+    var r = M.r12[si][brand], t = M.r12[si]['Segment total'], a = 0, b = 0;
+    for (var w = lo; w <= hi; w++) if (r.un[w] != null && t.un[w] != null) { a += r.un[w]; b += t.un[w]; }
+    return b ? a / b * 100 : null;
+  }
+  // Share change over six months (clean weeks) and around each Prime event inside the window.
+  function shareChange(M, si, brand) {
+    var s0 = cleanShare(M, si, brand, 80, 85), s1 = cleanShare(M, si, brand, 96, 101);
+    return { was: s0, now: s1, d: s0 != null && s1 != null ? s1 - s0 : null };
+  }
+  function cleanShare(M, si, brand, lo, hi) {
+    var r = M.r12[si][brand], t = M.r12[si]['Segment total'], a = 0, b = 0;
+    for (var w = lo; w <= hi; w++) if (!excluded(w) && r.un[w] != null && t.un[w] != null) { a += r.un[w]; b += t.un[w]; }
+    return b ? a / b * 100 : null;
+  }
+  function shareEvent(M, si, brand, e) {
+    var before = shareOver(M, si, brand, e - 3, e - 1), during = shareOver(M, si, brand, e, e), after = shareOver(M, si, brand, e + 1, Math.min(e + 3, W - 1));
+    return { before: before, during: during, after: after, dDuring: during - before, dAfter: after - before };
   }
 
-  // Movement now: last 11 clean weeks vs the 11 before, and the last 4 vs the 4 before, same ASINs.
-  function nowRows(M, si) {
-    return M.tariff.filter(function (t) { return t.si === si; }).map(function (t) {
-      var p13 = t.w13 != null ? t.w13 - 100 : null, p4 = t.w4 != null ? t.w4 - 100 : null, yy = t.yy != null ? t.yy - 100 : null;
-      var dir = p13 == null ? '—' : p13 <= -3 ? 'Cutting' : p13 >= 3 ? 'Raising' : 'Holding';
-      return { brand: t.brand, isBritax: t.brand === 'Britax group', isAll: t.brand === 'All competitors', bu: t.bu, p13: p13, p4: p4, yy: yy, cov13: t.w13Cov, covYY: t.yyCov, dir: dir, thin: t.bu < 40 };
-    }).sort(function (a, b) { return (a.isAll ? 1 : 0) - (b.isAll ? 1 : 0) || (a.isBritax ? 1 : 0) - (b.isBritax ? 1 : 0) || (a.p13 == null ? 99 : a.p13) - (b.p13 == null ? 99 : b.p13); });
-  }
-
-  // Off-promo moves: sustained moves of 5% or more on non-event weeks. Bucketed by when they happen.
-  function moveRows(M, si) {
-    return M.moves.filter(function (m) { return m.si === si && m.brand !== 'All competitors'; }).map(function (m) {
-      var bucket = inDeal(m.week) ? 'Other deal period' : OTHER_EVENT_WEEKS.indexOf(m.week) >= 0 ? 'Other deal period' : inTariff(m.week) ? 'Tariff window' : 'Outside promo';
-      var afterEvent = EVENTS.some(function (e) { return m.week === e.week + 2; });
-      return { brand: m.brand, isBritax: m.brand === 'Britax group', week: m.week, chg: m.chg, confirmed: m.confirmed, bucket: bucket, afterEvent: afterEvent, recent: m.week >= 94 };
-    }).sort(function (a, b) { return b.week - a.week; });
-  }
-
-  // Britax flag status. A competitor cut is only flagged as 'Britax not following' when Britax did not move the same way over the same weeks.
-  // Britax's own basket can go blank (few of its baseline ASINs still sell), so its last-4-vs-prior-4 same-ASIN change is used as a second check.
-  function flagStatus(M, si) {
-    var rows = moveRows(M, si), recentComp = rows.filter(function (r) { return !r.isBritax && r.week >= 94; });
-    var recentBritax = rows.filter(function (r) { return r.isBritax && r.week >= 94; });
-    var sum = segmentSummary(M, si);
-    var cuts = recentComp.filter(function (r) { return r.chg <= -5; }), raises = recentComp.filter(function (r) { return r.chg >= 5; });
-    var bCut = recentBritax.filter(function (r) { return r.chg <= -5; }), b4 = sum.britaxBasket4;
-    var britaxFollowed = bCut.length > 0 || (b4 != null && b4 <= -5);
-    var gapWide = sum.premium != null && sum.premiumPrior != null && sum.premium - sum.premiumPrior >= 5;
-    var flags = [];
-    function wkList(a) { return wkLabel(Math.min.apply(null, a.map(function (r) { return r.week; }))); }
-    if (cuts.length) {
-      var txt = cuts.map(function (r) { return r.brand + ' ' + fmt1(r.chg) + '%'; }).join(', ') + ' from the week of ' + wkList(cuts);
-      if (britaxFollowed) flags.push({ level: 'blue', text: txt + '. Britax moved the same way (' + (b4 != null && b4 <= -5 ? fmt1(b4) + '% same-ASIN, last 4 vs prior 4 weeks' : fmt1(bCut[0].chg) + '%') + '). Unconfirmed and probably the Labor Day pricing cluster' });
-      else flags.push({ level: 'amber', text: txt + ' (competitor cut outside a Prime event, Britax has not followed)' });
-    } else if (britaxFollowed) {
-      flags.push({ level: 'blue', text: 'Britax cut price ' + (b4 != null && b4 <= -5 ? fmt1(b4) + '% (same ASINs, last 4 vs prior 4 weeks)' : fmt1(bCut[0].chg) + '%') + ' with no matching competitor cut. Likely Britax\'s own Labor Day pricing; check it ends' });
-    }
-    if (gapWide) flags.push({ level: 'amber', text: 'Britax premium over competitor average widened by ' + fmt1(sum.premium - sum.premiumPrior) + ' points vs the prior 11 weeks' });
-    var other = recentBritax.filter(function (r) { return bCut.indexOf(r) < 0; });
-    if (other.length) flags.push({ level: 'blue', text: 'Britax moved ' + other.map(function (r) { return fmt1(r.chg) + '% (week of ' + wkLabel(r.week) + (r.confirmed ? '' : ', unconfirmed') + ')'; }).join(', ') });
-    if (raises.length && !cuts.length) flags.push({ level: 'green', text: raises.map(function (r) { return r.brand + ' +' + fmt1(r.chg) + '%'; }).join(', ') + ' raised outside a Prime event: the gap is closing' });
-    return { flags: flags, level: flags.some(function (f) { return f.level === 'amber'; }) ? 'amber' : flags.length ? 'green' : 'clear' };
-  }
-
-  // Stabilisation: how much weekly price noise is left, and whether brands' last 11 weeks sit within 3% of the 11 before.
-  function stability(M, si) {
-    var b = M.basket[si] && M.basket[si]['All competitors'];
-    function vol(lo, hi) {
-      if (!b) return null; var ch = [];
-      for (var i = lo + 1; i <= hi; i++) { var a = b.idx[i - 1], c = b.idx[i]; if (a != null && c != null && !isPrimeEventWeek(i) && !isPrimeEventWeek(i - 1) && OTHER_EVENT_WEEKS.indexOf(i) < 0 && OTHER_EVENT_WEEKS.indexOf(i - 1) < 0) ch.push((c / a - 1) * 100); }
-      if (ch.length < 5) return null; var m = ch.reduce(function (s, x) { return s + x; }, 0) / ch.length;
-      return Math.sqrt(ch.reduce(function (s, x) { return s + (x - m) * (x - m); }, 0) / (ch.length - 1));
-    }
-    var rows = M.tariff.filter(function (t) { return t.si === si && t.brand !== 'All competitors' && t.brand !== 'Britax group' && t.bu >= 40 && t.w13 != null && (t.w13Cov || 0) >= 60; });
-    var totalU = rows.reduce(function (s, t) { return s + t.bu; }, 0);
-    var calm = rows.filter(function (t) { return Math.abs(t.w13 - 100) < 3; }), calmU = calm.reduce(function (s, t) { return s + t.bu; }, 0);
-    var lvl = M.tariff.filter(function (t) { return t.si === si && t.brand === 'All competitors'; })[0];
-    var junVsNow = b && b.idx ? null : null;
-    var jun = lvl ? lvl.jj : null; // Jun-25 vs Jan-25
-    var volT = vol(14, 36), volN = vol(91, 101);
-    var volN2 = vol(60, 105);
-    return { volTariff: volT, volNow: volN, calmShare: totalU ? calmU / totalU * 100 : null, calmBrands: calm.length, brands: rows.length,
-      compLast13: lvl && lvl.w13 != null ? lvl.w13 - 100 : null, compLast4: lvl && lvl.w4 != null ? lvl.w4 - 100 : null,
-      stabilised: lvl && lvl.w13 != null && Math.abs(lvl.w13 - 100) < 3 && (totalU ? calmU / totalU : 0) >= 0.6, vol60: volN2 };
-  }
-
-  // October Prime events against the 52-week baseline: one row per brand with before / during / after share, price vs baseline and promotion depth.
-  function promoBrands(M, si, ev) {
-    var rows = M.promo.filter(function (r) { return r.si === si && r.ev === ev; });
-    var tot = rows.filter(function (r) { return r.brand === 'Segment total'; })[0];
-    var prov = ev === 1;
-    return rows.filter(function (r) { return r.brand !== 'Segment total'; }).map(function (r) {
-      var sh = r.per.map(function (p, k) { return p.u / tot.per[k].u * 100; });
-      return { brand: r.brand, isBritax: r.brand === 'Britax group', isAll: r.brand === 'All competitors', per: r.per, sh: sh, dShare: sh[2] - sh[0], lift: r.per[1].u / r.per[0].u, retain: r.per[2].u / r.per[0].u,
-        thin: r.per[0].u < 40, provisional: prov };
-    }).sort(function (a, b) { return (a.isAll ? 1 : 0) - (b.isAll ? 1 : 0) || b.per[0].u - a.per[0].u; });
-  }
-  // Weekly price index vs baseline and % of units on promotion, event-6 .. event+3, as arrays indexed by absolute week.
-  function promoWeekly(M, si, ev, own) {
-    var r = M.pweek.filter(function (x) { return x.si === si && x.ev === ev && x.own === own; })[0], e = EVENTS[ev].week;
-    var idx = [], pu = [];
-    if (r) for (var k = 0; k < 10; k++) { var w = e - 6 + k; if (w <= W - 1) { idx[w] = r.idx[k]; pu[w] = r.pu[k] == null ? null : r.pu[k]; } }
-    // a week with no baseline coverage has no promo share either
-    for (var i in idx) if (idx[i] == null) pu[i] = null;
-    return { idx: idx, pu: pu, lo: Math.max(0, e - 6), hi: Math.min(W - 1, e + 3) };
-  }
-  // SKU-level promotion status: before / during / after vs the SKU's own 52-week baseline price.
-  function promoSkus(M, si, ev, own) {
-    return M.psku.filter(function (r) { return r.si === si && r.ev === ev && r.own === own; }).map(function (r) {
-      var d = function (p) { return p == null || !r.base ? null : (p / r.base - 1) * 100; };
-      var d0 = d(r.p0), d1 = d(r.p1), d2 = d(r.p2), flags = [];
-      if (d0 != null && d0 <= -5) flags.push('Early deal');
-      if (d1 != null && d1 <= -5) flags.push('On promo in event');
-      if (d2 != null && d2 <= -5) flags.push('Promo continues after');
-      if (d1 != null && d1 > -5 && d1 < 5) flags.push('At baseline in event');
-      if (d1 != null && d1 >= 5) flags.push('Above baseline in event');
-      return { asin: r.asin, brand: r.brand, title: r.title, base: r.base, p0: r.p0, p1: r.p1, p2: r.p2, d0: d0, d1: d1, d2: d2, u0: r.u0, u1: r.u1, u2: r.u2, lift: r.u0 ? r.u1 / r.u0 : null, flags: flags, onPromo: d1 != null && d1 <= -5 };
-    }).sort(function (a, b) { return (b.u1 || 0) - (a.u1 || 0); });
-  }
-
-  // Price ladder for one segment: brand ASPs, market quartiles, Britax position.
-  function ladderRows(M, si) {
-    var w = M.weekly[si];
-    var bAsp = wavg(w.ab, w.ub, CLEAN_NOW[0], CLEAN_NOW[1]), bU = sumRange(w.ub, CLEAN_NOW[0], CLEAN_NOW[1]) / 11;
-    var bLY = wavg(w.ab, w.ub, CLEAN_LY[0], CLEAN_LY[1]), bLYu = sumRange(w.ub, CLEAN_LY[0], CLEAN_LY[1]) / 9;
-    var bP = wavg(w.ab, w.ub, CLEAN_PRIOR[0], CLEAN_PRIOR[1]), bPu = sumRange(w.ub, CLEAN_PRIOR[0], CLEAN_PRIOR[1]) / 11;
-    var cAsp = wavg(w.ac, w.uc, CLEAN_NOW[0], CLEAN_NOW[1]), cU = sumRange(w.uc, CLEAN_NOW[0], CLEAN_NOW[1]) / 11;
-    var rows = M.ladder.filter(function (r) { return r.si === si && !r.mkt && r.asp != null && r.units >= 5; }).map(function (r) {
-      return { brand: r.brand, asp: r.asp, units: r.units, aspLY: r.aspLY, aspPrior: r.aspPrior, isBritax: false };
+  // Key products: current price vs the SKU's 12-month baseline, range, promo weeks.
+  function skuRows(M, si, own) {
+    return M.skus.filter(function (s) { return s.si === si && s.own === own; }).map(function (s) {
+      var p = s.price, have = p.filter(function (v) { return v != null; });
+      var cur = avg(slice(p, 98, 101)), last = p[W - 1];
+      var promoWk = have.filter(function (v) { return v <= 0.95 * s.base; }).length;
+      var up = cur != null ? (cur / s.base - 1) * 100 : null;
+      var flags = [];
+      if (cur != null && up <= -5) flags.push('On promo now'); else if (cur != null && up >= 5) flags.push('Priced above baseline'); else flags.push('At baseline');
+      if (have.length && promoWk / have.length >= 0.25) flags.push('Promotes often');
+      return { brand: s.brand, title: s.title, asin: s.asin, base: s.base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, weeks: have.length, price: p, flags: flags };
     });
-    rows.push({ brand: 'Britax group', asp: bAsp, units: bU, aspLY: bLY, aspPrior: bP, isBritax: true });
-    rows.sort(function (a, b) { return b.asp - a.asp; });
-    var mkt = M.ladder.filter(function (r) { return r.si === si && r.mkt; })[0];
-    var totalU = rows.reduce(function (s, r) { return s + r.units; }, 0);
-    return { rows: rows, mkt: mkt, compAsp: cAsp, compUnits: cU, britaxRank: rows.findIndex(function (r) { return r.isBritax; }) + 1, listed: rows.length, shown: totalU };
   }
 
-  var api = {
-    W: W, SEGMENTS: SEGMENTS, EVENTS: EVENTS, TARIFF_WINDOW: TARIFF_WINDOW, CLEAN_NOW: CLEAN_NOW, CLEAN_PRIOR: CLEAN_PRIOR, CLEAN_LY: CLEAN_LY,
-    OTHER_EVENT_WEEKS: OTHER_EVENT_WEEKS, DEAL_PERIODS: DEAL_PERIODS,
-    wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, isPrimeEventWeek: isPrimeEventWeek, inDeal: inDeal, fmt1: fmt1,
-    parse: parse, segmentSummary: segmentSummary, tariffRows: tariffRows, nowRows: nowRows, moveRows: moveRows, flagStatus: flagStatus, stability: stability,
-    promoBrands: promoBrands, promoWeekly: promoWeekly, promoSkus: promoSkus, ladderRows: ladderRows, OTHER_PRIME: OTHER_PRIME
-  };
+  var api = { W: W, R12_START: R12_START, SEGMENTS: SEGMENTS, CORE: CORE, PRIME: PRIME, TARIFF: TARIFF,
+    wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, primeWeek: primeWeek, excluded: excluded, f1: f1, avg: avg,
+    parse: parse, trendSeries: trendSeries, findMoves: findMoves, stability: stability, tariffRow: tariffRow, brands: brands,
+    promoStats: promoStats, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.BritaxAnalytics = api;
 })(typeof window !== 'undefined' ? window : this);

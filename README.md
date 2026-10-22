@@ -1,10 +1,12 @@
 # Britax US pricing and share dashboard
 
-Password-protected dashboard for Britax on Amazon US. It answers seven questions from Market Share estimates (prices and units) for Jan 2025 to Oct 2026:
-who raised prices for tariffs, where competitors are moving now, off-promo price moves and the Britax flag, whether prices have stabilised, lower vs hold,
-where the market sits on price, and how competitors perform after Prime events.
+Password-protected dashboard for Britax on Amazon US, built from Market Share estimates (prices and units) for Oct 2024 to Oct 2026. Four views:
+1. **Price trend and stability**: who raised price (tariff period Jan to Jun 2025), a trend chart of Britax, all competitors combined and single brands, 5%+ moves marked, Prime events mapped, and which competitors have been stable over the last 6 months compared with Britax.
+2. **Promotions vs 12-month baseline**: share of units sold 5%+ below each product's 12-month median price, by brand and segment, in and out of Prime weeks.
+3. **Key competitor products**: best-selling Britax and competitor products in Britax's top 20% of categories (convertible, booster, other strollers, double strollers).
+4. **Share around Prime days**: weekly share for the last 6 months, six-month change, and before / during / after tables for each Prime event.
 
-Definitions: tariff period = Jan to Jun 2025. Promotional periods = June and October Prime events (Prime Day Jul 2025 stands in for June 2025, which had no event; Prime Big Deal Days Oct 2025; Prime Day Jun 2026; Prime Big Deal Days Oct 2026).
+Definitions: tariff period = Jan to Jun 2025. Prime events = June and October (Prime Day Jul 2025 stands in for June 2025, which had no event; Prime Big Deal Days Oct 2025; Prime Day Jun 2026; Prime Big Deal Days Oct 2026).
 
 ## How it is built
 - Next.js 14 (App Router). The page and its data are precomputed from Databricks (see `queries.sql`), so nothing is queried at view time.
@@ -21,4 +23,4 @@ Definitions: tariff period = Jan to Jun 2025. Promotional periods = June and Oct
 Local: `npm install`, then `DASHBOARD_PASSWORD=choose-one npm run dev`.
 
 ## Refreshing the data
-Re-run the queries in `queries.sql` for the new latest week, rewrite `private/data-*.js`, run `npm run verify`, and update the week constants in `private/analytics.js` (`CLEAN_NOW`, `CLEAN_PRIOR`, `CLEAN_LY`, `EVENTS`) and `private/app.js` (`LAST`).
+Re-run the queries in `queries.sql` for the new latest week, rewrite `private/data-*.js`, run `npm run verify`, and update the week constants in `private/analytics.js` (`W`, `R12_START`, `PRIME`) and the six-month windows in `analytics.js` (`stability`, `shareChange`) and `app.js`.
