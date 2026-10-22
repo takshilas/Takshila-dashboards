@@ -210,6 +210,7 @@
       '<h3>How Britax is flagged</h3>' +
       '<div id="flags">' + (fl.flags.length ? fl.flags.map(function (x) { return '<div class="flagrow"><span class="pill ' + x.level + '">' + (x.level === 'amber' ? 'Flag' : x.level === 'blue' ? 'Britax move' : 'Info') + '</span><span>' + esc(x.text) + '</span></div>'; }).join('') : '<div class="flagrow"><span class="pill clear">Clear</span><span>No competitor move of 5% or more since the week of ' + wk(94) + ', and no change in the Britax price gap.</span></div>') + '</div>' +
       '<p class="rule">Britax is flagged when (a) a competitor with 40+ units a week changes price 5% or more for four weeks running outside a Prime event, Black Friday or the Feb–Mar deal periods, and Britax does not follow, or (b) Britax\'s own price gap to the competitor average moves 5+ points in a quarter. Britax\'s own moves are listed in blue so they can be told apart from market moves. Prime events, the week either side and the weeks before an event are never used as the start of a move.</p>' +
+      '<p class="rule">' + britaxPattern() + '</p>' +
       '<h3>Timeline of sustained price moves</h3>' + legend + chartBox('c3', 'Timeline of sustained competitor and Britax price moves') +
       '<h3>All moves</h3><div class="controls"><label>Show <select id="mvFilter"><option value="Outside promo">Outside promo only</option><option value="all">Everything found</option><option value="Tariff window">Tariff window</option><option value="Other deal period">Other deal periods</option></select></label>' + exportBtn('t3', 'off-promo-price-moves') + '</div><div class="scroll"><table class="tbl" id="t3"></table></div>';
     var cols = [
@@ -225,6 +226,15 @@
     };
     $('mvFilter').onchange = drawT; drawT();
     drawTimeline('c3', rows.filter(function (r) { return r.bucket !== 'Other deal period'; }), si);
+  }
+
+  // Does Britax cut price around Memorial Day and Labor Day (outside Prime events)? Counted across all segments.
+  function britaxPattern() {
+    var inRange = function (lo, hi) { return M.moves.filter(function (m) { return m.brand === 'Britax group' && m.chg <= -5 && m.week >= lo && m.week <= hi; }); };
+    var may = inRange(82, 84), sep = inRange(98, 100);
+    var segs = function (a) { var o = {}; a.forEach(function (m) { o[m.si] = 1; }); return Object.keys(o).length; };
+    var rng = function (a) { var c = a.map(function (m) { return m.chg; }); return c.length ? Math.abs(Math.max.apply(null, c)).toFixed(0) + ' to ' + Math.abs(Math.min.apply(null, c)).toFixed(0) + '%' : ''; };
+    return '<b>Pattern across segments:</b> Britax\'s own sustained cuts of ' + rng(may) + ' started in the weeks around Memorial Day (mid-May 2026) in ' + segs(may) + ' segments, and cuts of ' + rng(sep) + ' started from the week of ' + wk(99) + ' (Labor Day) in ' + segs(sep) + '. Both sit outside the Prime events and are unconfirmed at the end of the data, so they show as Britax moves here.';
   }
 
   function drawTimeline(id, rows, si) {
@@ -317,27 +327,28 @@
     var comps = rows.filter(function (r) { return !r.isBritax && !r.isAll && !r.thin; });
     var big = comps.slice().sort(function (a, b) { return (a.pxE == null ? 99 : a.pxE) - (b.pxE == null ? 99 : b.pxE); })[0];
     var gainer = comps.slice().sort(function (a, b) { return b.dShare - a.dShare; })[0], loser = comps.slice().sort(function (a, b) { return a.dShare - b.dShare; })[0];
-    var nPost = state.ev === 3 ? '1 week' : '3 weeks';
-    var ans = 'After <b>' + esc(e.label) + '</b>, Britax unit share went from <b>' + f1(britax.shLead) + '%</b> before to <b>' + f1(britax.shPost) + '%</b> after (' + pp(britax.dShare) + '); after the event competitor units ran at ' + f1(all.retain * 100, 0) + '% of their pre-event weekly level vs ' + f1(britax.retain * 100, 0) + '% for Britax. ' +
-      (big && big.pxE != null && big.pxE < 97 ? esc(big.brand) + ' cut price most for the event (' + sgn(big.pxE - 100, 0) + ')' + (big.pxP != null ? ' and sat at ' + sgn(big.pxP - 100, 0) + ' afterwards' : '') + '. ' : '') +
+    var prov = britax.provisional;
+    var ans = 'After <b>' + esc(e.label) + '</b>, Britax unit share went from <b>' + f1(britax.shLead) + '%</b> before to <b>' + f1(britax.shPost) + '%</b> after (' + pp(britax.dShare) + '); ' + (prov ? 'in the first week after' : 'in weeks 2 to 4 after') + ', competitor units ran at ' + f1(all.retain * 100, 0) + '% of their pre-event weekly level vs ' + f1(britax.retain * 100, 0) + '% for Britax. ' +
+      (big && big.pxE != null && big.pxE < 97 ? esc(big.brand) + ' cut price most for the event (' + sgn(big.pxE - 100, 0) + ')' + (big.pxAfter != null ? ' and sat at ' + sgn(big.pxAfter - 100, 0) + ' afterwards' : '') + '. ' : '') +
       (gainer && loser && gainer.brand !== loser.brand ? 'Biggest share gain: ' + esc(gainer.brand) + ' (' + pp(gainer.dShare) + '); biggest loss: ' + esc(loser.brand) + ' (' + pp(loser.dShare) + ').' : '');
     $('s7').innerHTML = rLead(si, { n: 7, h: 'After a promotion ends, how are competitors performing and what are they reacting to?' }) +
       '<div class="controls"><label>Event <select id="evSel">' + EV.map(function (x) { return '<option value="' + x.id + '"' + (x.id === state.ev ? ' selected' : '') + '>' + esc(x.label) + '</option>'; }).join('') + '</select></label>' + exportBtn('t7', 'post-promo') + '</div>' +
       '<div class="answer">' + ans + '</div>' +
       (e.note ? '<div class="note">' + esc(e.note) + '.</div>' : '') +
-      '<p class="muted">Lead-in = the 4 weeks ending 3 weeks before the event (weeks just before an event often already carry early deals). Post = the ' + nPost + ' after. Share = brand units ÷ all units in the segment. Price = same-ASIN change vs lead-in (100 = no change). "Reacting to" is read from price: a deeper cut during the event, a give-back after, or a lasting lower price.</p>' +
+      '<p class="muted">Lead-in = the 4 weeks that end 7 weeks before the event, so early deals and Britax\'s own Memorial Day and Labor Day pricing are not in it. "After" = weeks 2 to 4 after the event' + (prov ? ' (not available yet for this event, so the first week after is used and is provisional)' : '; the first week after is shown separately because it is still event-affected') + '. Share = brand units ÷ all units in the segment. Price = same-ASIN change vs lead-in (100 = no change). "Reacting to" is read from price: a deeper cut during the event, a give-back after, or a lasting lower or higher price.</p>' +
       '<div class="scroll"><table class="tbl" id="t7"></table></div>';
     $('evSel').onchange = function (ev) { state.ev = +ev.target.value; sync(); s7(si); };
     table('t7', [
       { key: 'brand', label: 'Brand', l: true, render: function (r) { return esc(r.isAll ? 'All competitor brands' : r.isBritax ? 'Britax group' : r.brand) + (r.thin ? ' <span class="muted">· low volume</span>' : ''); } },
       { key: 'lead', label: 'Units/wk before', render: function (r) { return fmtN(r.lead); } },
       { key: 'event', label: 'Event week units', render: function (r) { return fmtN(r.event) + ' <span class="muted">(' + f1(r.liftX) + 'x)</span>'; } },
-      { key: 'post', label: 'Units/wk after', render: function (r) { return fmtN(r.post) + ' <span class="muted">(' + f1(r.retain * 100, 0) + '% of before)</span>'; } },
+      { key: 'p1', label: 'Week after units', render: function (r) { return fmtN(r.p1); } },
+      { key: 'p24', label: prov ? 'Weeks 2–4 after' : 'Units/wk, weeks 2–4 after', render: function (r) { return r.p24 == null ? '—' : fmtN(r.p24) + ' <span class="muted">(' + f1(r.p24 / r.lead * 100, 0) + '% of before)</span>'; } },
       { key: 'shLead', label: 'Share before', render: function (r) { return f1(r.shLead) + '%'; } },
-      { key: 'shPost', label: 'Share after', render: function (r) { return f1(r.shPost) + '%'; } },
+      { key: 'shPost', label: prov ? 'Share, week after' : 'Share, weeks 2–4', render: function (r) { return f1(r.shPost) + '%'; } },
       { key: 'dShare', label: 'Share change', render: function (r) { return '<span class="' + (r.dShare > 0.05 ? 'down' : r.dShare < -0.05 ? 'up' : '') + '">' + pp(r.dShare) + '</span>'; } },
       { key: 'pxE', label: 'Price in event', render: function (r) { return r.pxE == null ? '—' : sgn(r.pxE - 100); } },
-      { key: 'pxP', label: 'Price after', render: function (r) { return r.pxP == null ? '—' : sgn(r.pxP - 100); } },
+      { key: 'pxAfter', label: prov ? 'Price, week after' : 'Price, weeks 2–4', render: function (r) { return r.pxAfter == null ? '—' : sgn(r.pxAfter - 100); } },
       { key: 'reaction', label: 'Reaction', l: true, wrap: true, sort: function (r) { return r.reaction.length; }, render: function (r) { return r.reaction.length ? esc(r.reaction.join('; ')) : '<span class="muted">No clear price reaction</span>'; } }
     ], rows.map(function (r) { r._cls = r.isBritax ? 'me' : r.isAll ? 'all' : ''; return r; }));
   }
@@ -350,7 +361,7 @@
       '<li><b>Promotional periods</b> = the June and October Prime events: Prime Day 2025 (July; there was no June event in 2025, so the July event stands in), Prime Big Deal Days Oct 2025, Prime Day Jun 2026 and Prime Big Deal Days Oct 2026. Event weeks are confirmed by a 40 to 120% jump in unit sales across the category. The week before and after each event, the pre-event weeks of Oct 2026, Black Friday and Cyber Monday weeks, and the Feb–Mar deal periods (units 20 to 40% above normal) are kept out of "outside promo" moves.</li>' +
       '<li><b>Sustained move</b> = the average of the next 4 clean weeks differs from the prior 4 clean weeks by 5% or more, at the largest point within ±3 weeks, and (where checkable) the new level still holds 4 to 8 weeks later. Brands under 40 baseline units a week are left out of all brand tables. Moves in the last weeks of data cannot be confirmed yet.</li>' +
       '<li><b>Oct 2026 is provisional.</b> Only one full week exists after Prime Big Deal Days Oct 2026 (week of 2026-10-11).</li>' +
-      '<li><b>Estimates vs actuals.</b> Market Share figures are estimates. A check of the 52 weeks to Oct 2026 found Britax estimated sales were about 77% of Vendor Central ordered revenue and estimated ASP about 8% lower. Use this page for relative price position and direction, not for revenue reporting.</li>' +
+      '<li><b>Estimates vs actuals.</b> Market Share figures are estimates. An earlier check of the Britax brand alone (excluding Bob Gear) over the 52 weeks to Oct 2026 found estimated sales about 77% of Vendor Central ordered revenue and estimated ASP about 8% lower. That check was not repeated for this page\'s Britax group (Britax plus Bob Gear). Use this page for relative price position and direction, not for revenue reporting.</li>' +
       '<li><b>Price ladder.</b> Implied ASP blends mix and price; a brand selling cheap and premium models shows one average. The quartiles use the price of every ASIN in the segment weighted by units.</li>' +
       '<li><b>Share.</b> Brand share is units divided by all units of brands flagged in the Market Share category for the segment, not the full Amazon category.</li></ul>';
   }

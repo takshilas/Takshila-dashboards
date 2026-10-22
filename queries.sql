@@ -28,11 +28,19 @@ SELECT 1;
 --    over basket ASINs with >= 2 units that week; blank when matched revenue < 40% of the basket. Rise start = first clean week from 17 where the
 --    index and the next two are >= 1.04 x the Jan-25 level (1.08 for the second column).
 -- C) Weekly implied ASP and units for Britax group vs all competitors per segment (data-weekly.js).
--- D) Events (data-events.js): lead-in = weeks e-6..e-3, event = e, post = e+1..e+3 (week 105 only for the Oct-26 event). Units per week, same-ASIN price vs lead-in.
+-- D) Events (data-events.js): lead-in = weeks e-10..e-7 (clear of early deals and Britax's own Memorial Day / Labor Day pricing), event = e, week after = e+1, weeks 2-4 after = e+2..e+4
+--    (blank for the Oct-26 event). Units per week, and same-ASIN price vs lead-in for event, week after and weeks 2-4.
 -- E) Price ladder (data-ladder.js): brand ASP and units/week for now, a year ago and prior; unit-weighted p25/p50/p75 of ASIN prices; share of units priced below Britax.
 -- F) Sustained moves (data-moves.js): on the clean series, avg(next 4 weeks) vs avg(prior 4 weeks), |change| >= 5%, largest within +-3 weeks,
 --    kept if the level 4-7 weeks later is the same sign and >= 60% of the move (or if there are not 2 clean weeks left to check).
 
--- Validation used when building: row counts from SQL (72 tariff rows, 216 event rows, 178 move rows) match the data files; every weekly and basket series
--- carries a checksum printed by the query and re-checked by scripts/verify-*.mjs (npm run verify).
--- Earlier check (52 weeks to Oct 2026): Britax estimated sales $27.66M vs Vendor Central ordered revenue $35.71M (77%), estimated ASP $233.65 vs $253.2.
+-- Validation used when building (all re-run after the final data was written):
+--  * weekly and basket series carry a checksum printed by the query and re-checked by scripts/verify-*.mjs (npm run verify);
+--  * events: row count, unit-column sums and the sums of the rounded price columns match the SQL (216 rows);
+--  * tariff: 72 rows, baseline units 154,192, sums of the Jun-vs-Jan, now-vs-baseline, 11-vs-11 and year-ago indices (8019.4 / 7523.9 / 6914.0 / 6857.7) match the SQL;
+--  * moves: 178 rows, sum of weeks 9,020, sum of changes 1,069.0%, 104 confirmed match the SQL;
+--  * independent recompute, written as separate SQL (per-ASIN window self-joins, not the conditional sums above): Britax convertible unit share 2.9% (wk 91-101),
+--    3.6% (wk 41-49), 3.0% (wk 76-86); all-competitor convertible same-ASIN change Jan to Jun 2025 +14.2%; Britax convertible same-ASIN year over year +9.8%.
+--    All five equal the figures on the page.
+--  * the price ladder table (78 rows) was checked by structure only.
+-- Earlier check (Britax brand only, excluding Bob Gear; 52 weeks to Oct 2026; not repeated for the Britax group): estimated sales $27.66M vs Vendor Central ordered revenue $35.71M (77%), estimated ASP $233.65 vs $253.2.
