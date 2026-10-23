@@ -36,11 +36,16 @@ SELECT 1;
 -- D) Key products (data-skus.js): top Britax and competitor ASINs by units over weeks 93..105 in segments 0, 1, 3, 4 (convertible, booster, other strollers, double strollers),
 --    with ASIN, brand, title (COALESCE(title, '(title not available)')), baseline price, units per week and the 52 weekly prices. ORDER BY ..., asin for a stable order.
 --
+-- E) Promo prices (data-prices.js): same base and baseline as C. Per segment x brand: units, sales and units x baseline price for promoted rows, and units and sales for non-promoted rows.
+--    avg price on promo = promo sales / promo units; off promo = non-promo sales / non-promo units; depth = 1 - promo sales / SUM(baseline price x units).
+-- F) Price ladder (data-ladder.js): per segment x brand (top 10 by units plus Britax group, shown as 'Britax'): units and sales for weeks 54..105, 93..105 and 80..92. All rows with units and sales > 0.
+-- G) Price range (data-range.js): per segment x own/competitor: count, min, median and max 52-week average price (sales / units) of products with 100+ units; % of covered units on promo for weeks 54..105 and 93..105.
+--
 -- Stitching, move detection, stability, promotion and share statistics are computed in the browser from these tables (private/analytics.js).
 --   moves: avg(next 4 clean weeks) vs avg(prior 4 clean weeks) >= 5%, largest within +-3 weeks, kept if the level 4-7 weeks later has the same sign and >= 60% of the move.
 --   clean weeks exclude Prime event weeks (e-2..e+1), Black Friday weeks (6, 7, 8, 59, 60) and weeks 0-1.
 
 -- Validation: every table row carries a checksum printed by its query and re-checked by scripts/verify-*.mjs (npm run verify):
---  * basket 42 rows, 12-month series 48 rows, key products 76 rows; tariff 72 rows checked against the SQL sums at build time.
+--  * basket 42 rows, 12-month series 48 rows, key products 76 rows, promo prices 42 rows, ladder 62 rows, range 12 rows; tariff 72 rows checked against the SQL sums at build time.
 --  * independent recompute as separate SQL: Britax convertible unit share 2.9% (wk 91-101); all-competitor convertible same-ASIN change Jan to Jun 2025 +14.2%.
 -- Earlier check (Britax brand only, excluding Bob Gear; 52 weeks to Oct 2026): estimated sales $27.66M vs Vendor Central ordered revenue $35.71M (77%), estimated ASP $233.65 vs $253.2.

@@ -32,7 +32,7 @@
   function f1(v) { return v == null || !isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1); }
 
   function parse(D) {
-    var out = { basket: {}, tariff: [], r12: {}, skus: [] };
+    var out = { basket: {}, tariff: [], r12: {}, skus: [], prices: {}, ladder: [], range: {} };
     D.basket.forEach(function (r) { var p = r.split('|'); (out.basket[+p[0]] = out.basket[+p[0]] || {})[p[1]] = { idx: nums(p[5]) }; });
     D.tariff.forEach(function (r) {
       var p = r.split('|'), v = p[3].split(',').map(function (x) { return x === '' ? null : Number(x); });
@@ -46,6 +46,9 @@
       var p = r.split('|'), b = p[5].split(','), pr = []; nums(p[6]).forEach(function (v, i) { pr[R12_START + i] = v; });
       out.skus.push({ si: +p[0], own: p[1] === 'B', asin: p[2], brand: p[3], title: p[4].trim(), base: +b[0], u13: +b[1], price: pr });
     });
+    (D.prices || []).forEach(function (r) { var p = r.split('|'), v = nums(p[2]); (out.prices[+p[0]] = out.prices[+p[0]] || {})[p[1]] = { pu: v[0], ps: v[1], pb: v[2], nu: v[3], ns: v[4] }; });
+    (D.ladder || []).forEach(function (r) { var p = r.split('|'), v = nums(p[2]); out.ladder.push({ si: +p[0], brand: p[1], u52: v[0], s52: v[1], u13: v[2], s13: v[3], up: v[4], sp: v[5] }); });
+    (D.range || []).forEach(function (r) { var p = r.split('|'), v = nums(p[2]); (out.range[+p[0]] = out.range[+p[0]] || {})[p[1]] = { n: v[0], lo: v[1], med: v[2], hi: v[3], p52: v[4], p13: v[5] }; });
     return out;
   }
 
@@ -130,6 +133,25 @@
       vs: tot.u ? tot.ix / tot.u - 100 : null, promoWeeks: promoWeeks, weeks: weeks, primeIdx: primeIdx, pu: r.pu };
   }
 
+  // Average price on promotion vs off promotion over the last 12 months. depth = how far below baseline promoted units sold (same products).
+  function promoPrices(M, si, brand) {
+    var p = M.prices[si] && M.prices[si][brand]; if (!p) return null;
+    var on = p.pu ? p.ps / p.pu : null, off = p.nu ? p.ns / p.nu : null;
+    return { on: on, off: off, depth: p.pb ? (1 - p.ps / p.pb) * 100 : null, gap: on != null && off ? (on / off - 1) * 100 : null };
+  }
+
+  // Brand price ladder for a segment: 12-month ASP, last 13 weeks vs prior 13 weeks, price vs Britax, unit share of all tracked brands.
+  function ladderRows(M, si) {
+    var tot = M.r12[si] && M.r12[si]['Segment total'], totU = tot ? unitsSum(tot) : null;
+    var rows = M.ladder.filter(function (r) { return r.si === si; }).map(function (r) {
+      var asp = r.s52 / r.u52, now = r.u13 ? r.s13 / r.u13 : null, prior = r.up ? r.sp / r.up : null;
+      return { brand: r.brand, units: r.u52, share: totU ? r.u52 / totU * 100 : null, asp: asp, now: now, prior: prior, chg: now && prior ? (now / prior - 1) * 100 : null };
+    }).sort(function (a, b) { return b.units - a.units; });
+    var me = rows.filter(function (r) { return r.brand === 'Britax'; })[0];
+    rows.forEach(function (r) { r.vsB = me && r !== me ? (r.asp / me.asp - 1) * 100 : null; });
+    return rows;
+  }
+
   // Unit share in a segment, weekly, from the 12-month tables.
   function shareSeries(M, si, brand) {
     var r = M.r12[si] && M.r12[si][brand], t = M.r12[si] && M.r12[si]['Segment total'], out = [];
@@ -164,16 +186,19 @@
       var cur = avg(slice(p, 98, 101)), last = p[W - 1];
       var promoWk = have.filter(function (v) { return v <= 0.95 * s.base; }).length;
       var up = cur != null ? (cur / s.base - 1) * 100 : null;
+      // Recent promotions: weeks 93..105 at 5% or more below baseline, the deepest of them, and the latest promoted week.
+      var recent = [], lastPromo = null, deepest = null;
+      for (var w = 93; w < W; w++) if (p[w] != null && p[w] <= 0.95 * s.base) { recent.push(w); lastPromo = w; var dd = (1 - p[w] / s.base) * 100; if (deepest == null || dd > deepest) deepest = dd; }
       var flags = [];
       if (cur != null && up <= -5) flags.push('On promo now'); else if (cur != null && up >= 5) flags.push('Priced above baseline'); else flags.push('At baseline');
       if (have.length && promoWk / have.length >= 0.25) flags.push('Promotes often');
-      return { brand: s.brand, title: s.title, asin: s.asin, base: s.base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, weeks: have.length, price: p, flags: flags };
+      return { brand: s.brand, title: s.title, asin: s.asin, base: s.base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, 93, W - 1).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags };
     });
   }
 
   var api = { W: W, R12_START: R12_START, SEGMENTS: SEGMENTS, CORE: CORE, PRIME: PRIME, TARIFF: TARIFF,
     wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, primeWeek: primeWeek, excluded: excluded, f1: f1, avg: avg,
     parse: parse, trendSeries: trendSeries, findMoves: findMoves, stability: stability, tariffRow: tariffRow, brands: brands,
-    promoStats: promoStats, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows };
+    promoStats: promoStats, promoPrices: promoPrices, ladderRows: ladderRows, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.BritaxAnalytics = api;
 })(typeof window !== 'undefined' ? window : this);

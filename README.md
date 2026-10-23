@@ -2,8 +2,8 @@
 
 Password-protected dashboard for Britax on Amazon US, built from Market Share estimates (prices and units) for Oct 2024 to Oct 2026. Four views:
 1. **Price trend and stability**: who raised price (tariff period Jan to Jun 2025), a trend chart of Britax, all competitors combined and single brands, 5%+ moves marked, Prime events mapped, and which competitors have been stable over the last 6 months compared with Britax.
-2. **Promotions vs 12-month baseline**: share of units sold 5%+ below each product's 12-month median price, by brand and segment, in and out of Prime weeks.
-3. **Key competitor products**: best-selling Britax and competitor products in Britax's top 20% of categories (convertible, booster, other strollers, double strollers).
+2. **Promotions vs 12-month baseline**: average price on and off promotion and promo depth against each product's 12-month median price, by brand and segment, plus a 12-month share trend with Prime weeks and Britax promo weeks marked.
+3. **Key competitor products**: price low, median, high and % promo for Britax vs competitors by segment, then the best-selling Britax and competitor products with recent promotions (top 20% of Britax categories).
 4. **Share around Prime days**: weekly share for the last 6 months, six-month change, and before / during / after tables for each Prime event.
 
 Definitions: tariff period = Jan to Jun 2025. Prime events = June and October (Prime Day Jul 2025 stands in for June 2025, which had no event; Prime Big Deal Days Oct 2025; Prime Day Jun 2026; Prime Big Deal Days Oct 2026).
