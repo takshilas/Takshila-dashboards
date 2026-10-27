@@ -24,7 +24,7 @@
   function mIdx(key) { var p = String(key).split('-'); return +p[0] * 12 + (+p[1] - 1); }
   function mName(ix) { return new Date(Date.UTC(Math.floor(ix / 12), ix % 12, 1)).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }); }
   function weeksBetween(a, b) { var o = []; for (var w = 0; w < W; w++) { var m = monthOf(w); if (m >= a && m <= b) o.push(w); } return o; }
-  var LATEST = monthOf(W - 1), FIRST_SELECTABLE = 2026 * 12;
+  var LATEST = monthOf(W - 1), FIRST_SELECTABLE = monthOf(W - 1); // the dashboard starts at Oct 2026; earlier months are not offered
   var MONTHS = []; for (var mi = FIRST_SELECTABLE; mi <= LATEST; mi++) MONTHS.push(mKey(mi));
   // Every window the dashboard uses, as lists of week indexes, for the month selected.
   function win(key) {
@@ -298,17 +298,19 @@
   // Key products: current price vs the SKU's 12-month baseline, range, promo weeks.
   // Weekly-price statistics of one key product (current price, vs baseline, promo weeks, recent promotions, status).
   function skuStat(s) {
-      var p = s.price, have = p.filter(function (v) { return v != null; });
-      var cur = avg(slice(p, 98, 101)), last = p[W - 1];
-      var promoWk = have.filter(function (v) { return v <= 0.95 * s.base; }).length;
-      var up = cur != null ? (cur / s.base - 1) * 100 : null;
-      // Recent promotions: weeks 93..105 at 5% or more below baseline, the deepest of them, and the latest promoted week.
-      var recent = [], lastPromo = null, deepest = null;
-      for (var w = 93; w < W; w++) if (p[w] != null && p[w] <= 0.95 * s.base) { recent.push(w); lastPromo = w; var dd = (1 - p[w] / s.base) * 100; if (deepest == null || dd > deepest) deepest = dd; }
+      var p = s.price, have = p.filter(function (v) { return v != null; }), base = s.asp;
+      // Price now = average weekly price in the selected month (latest weeks if the month has no price); baseline = the product's average selling price over the last 12 months.
+      var cur = avg(WIN.month.map(function (w) { return p[w]; }));
+      if (cur == null) cur = avg(slice(p, WIN.last - 3, WIN.last)); var last = p[WIN.last];
+      var promoWk = have.filter(function (v) { return v <= 0.95 * base; }).length;
+      var up = cur != null && base ? (cur / base - 1) * 100 : null;
+      // Recent promotions: the last 13 weeks to the selected month, 5% or more below the baseline, the deepest of them, and the latest promoted week.
+      var recent = [], lastPromo = null, deepest = null, lo13 = WIN.last - 12;
+      for (var w = lo13; w <= WIN.last; w++) if (p[w] != null && p[w] <= 0.95 * base) { recent.push(w); lastPromo = w; var dd = (1 - p[w] / base) * 100; if (deepest == null || dd > deepest) deepest = dd; }
       var flags = [];
       if (cur != null && up <= -5) flags.push('On promo now'); else if (cur != null && up >= 5) flags.push('Priced above baseline'); else flags.push('At baseline');
       if (have.length && promoWk / have.length >= 0.25) flags.push('Promotes often');
-      return { brand: s.brand, title: s.title, asin: s.asin, base: s.base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, 93, W - 1).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags, asp: s.asp };
+      return { brand: s.brand, title: s.title, asin: s.asin, base: base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, lo13, WIN.last).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags, asp: s.asp };
   }
   function skuRows(M, si, own) {
     return M.skus.filter(function (s) { return s.si === si && s.own === own; }).map(skuStat);
@@ -376,6 +378,13 @@
     var sh25 = tierShare(M, si, t, g, WIN.py), sh26 = tierShare(M, si, t, g, WIN.ytd);
     return { sh25: sh25, sh26: sh26, d: sh25 != null && sh26 != null ? sh26 - sh25 : null };
   }
+  // Same measures as the share comparison table, for one group within one price tier: estimated sales (YTD, prior year, prior-year same weeks), % change, share and share difference.
+  function tierBrandCompare(M, si, t, g) {
+    var s26 = tsum(M, si, t, g, WIN.ytd, 's'), s25 = tsum(M, si, t, g, WIN.py, 's'), s25b = tsum(M, si, t, g, WIN.pytd, 's'), a26 = tsum(M, si, t, TG, WIN.ytd, 's'), a25 = tsum(M, si, t, TG, WIN.py, 's');
+    if (s26 == null) return { s26: null, s25: null, s25b: null, chg: null, sh26: null, sh25: null, d: null };
+    var sh26 = a26 ? s26 / a26 * 100 : null, sh25 = a25 ? s25 / a25 * 100 : null;
+    return { s26: s26, s25: s25, s25b: s25b, chg: s25b ? (s26 / s25b - 1) * 100 : null, sh26: sh26, sh25: sh25, d: sh26 != null && sh25 != null ? sh26 - sh25 : null };
+  }
   // Share in Prime weeks vs other weeks, 2026 year to date, for one group in one tier.
   function tierPrimeVs(M, si, t, g) {
     var all = WIN.ytd, prime = [], other = [];
@@ -403,7 +412,7 @@
     wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, primeWeek: primeWeek, excluded: excluded, f1: f1, avg: avg,
     parse: parse, trendSeries: trendSeries, findMoves: findMoves, stability: stability, tariffRow: tariffRow, brands: brands,
     promoStats: promoStats, win: current, setMonth: setMonth, monthName: function (k) { return mName(mIdx(k)); }, MONTHS: MONTHS, mName: mName, mKey: mKey, cleanWeeks: cleanWeeks, compareRows: compareRows, priceRows: priceRows, promoPrices: promoPrices, skuAll: skuAll, shareWeeks: shareWeeks, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows, tierSkuRows: tierSkuRows,
-    TIER_NAMES: TIER_NAMES, tierRange: tierRange, tierLabel: tierLabel, tierShare: tierShare, tierShareSeries: tierShareSeries, tierOverview: tierOverview, tierPrice: tierPrice, tierPromo: tierPromo, tierBrands: tierBrands, tierBrandShare: tierBrandShare, tierPrimeVs: tierPrimeVs, tierChange: tierChange, tierEvent: tierEvent,
+    TIER_NAMES: TIER_NAMES, tierRange: tierRange, tierLabel: tierLabel, tierShare: tierShare, tierShareSeries: tierShareSeries, tierOverview: tierOverview, tierPrice: tierPrice, tierPromo: tierPromo, tierBrands: tierBrands, tierBrandShare: tierBrandShare, tierBrandCompare: tierBrandCompare, tierPrimeVs: tierPrimeVs, tierChange: tierChange, tierEvent: tierEvent,
     elastRows: elastRows, elastStat: elastStat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.BritaxAnalytics = api;
 })(typeof window !== 'undefined' ? window : this);
