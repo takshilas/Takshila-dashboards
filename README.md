@@ -1,10 +1,14 @@
 # Britax US pricing and share dashboard
 
-Password-protected dashboard for Britax on Amazon US, built from Market Share estimates (prices and units) for Oct 2024 to Oct 2026. Four views:
-1. **Price trend and stability**: who raised price (tariff period Jan to Jun 2025), a trend chart of Britax, all competitors combined and single brands, 5%+ moves marked, Prime events mapped, and which competitors have been stable over the last 6 months compared with Britax.
-2. **Promotions vs 12-month baseline**: average price on and off promotion and promo depth against each product's 12-month median price, by brand and segment, plus a 12-month share trend with Prime weeks and Britax promo weeks marked.
-3. **Key competitor products**: price low, median, high and % promo for Britax vs competitors by segment, then the best-selling Britax and competitor products with recent promotions (top 20% of Britax categories).
-4. **Share around Prime days**: weekly share for the last 6 months, six-month change, and before / during / after tables for each Prime event.
+Password-protected dashboard for Britax on Amazon US, built from Market Share estimates (prices and units) for Oct 2024 to Oct 2026. Six tabs, each by Amazon category (Car Seats, Strollers, Travel Systems, Accessories; the comparison and summary tabs also have All categories):
+1. **Price and promo** (each table also has a closed “By price tier” block: Value, Mid and Premium tiers by each product's own average price, Britax vs all competitors): who raised price (tariff period Jan to Jun 2025) with a trend chart of Britax, all competitors combined and single brands; average retail price (discounted weeks left out) for Britax vs each brand: 2025 vs 2024, 2026 YTD vs 2025 YTD, Oct 2026 vs Sep 2026; average price on and off promotion against a 12-month baseline, by brand or by product; Britax vs competitors by segment; brand price ladder.
+2. **Market share**: weekly share for the last 12 months with Prime weeks and Britax promo weeks marked, and share in Prime weeks vs other weeks.
+3. **Key competitor products**: price low, median, high and % promo for Britax vs competitors by segment, then the best-selling Britax and competitor products with recent promotions (Britax's two largest categories, Car Seats and Strollers).
+4. **Share around Prime days**: six-month share change and before / during / after tables for each Prime event, with promo columns.
+5. **Price elasticity**: elasticity of Britax group products from the CommerceIQ feed (latest 2026 feed), by category, price tier and brand.
+6. **Share comparison and category summary**: 2026 year-to-date vs 2025 estimated sales and market share for competitor and Britax brands, by category or all categories, followed by donut charts of Britax vs others and of Britax and top competitor brands for 2026 YTD and 2025, ASIN counts by brand and the category total.
+
+All promo comparisons use each product's median price over the last 52 weeks as the baseline. Tariff comparisons use the pre-tariff level (Q4 2024) because the 52-week window starts after the tariff move.
 
 Definitions: tariff period = Jan to Jun 2025. Prime events = June and October (Prime Day Jul 2025 stands in for June 2025, which had no event; Prime Big Deal Days Oct 2025; Prime Day Jun 2026; Prime Big Deal Days Oct 2026).
 
@@ -24,3 +28,6 @@ Local: `npm install`, then `DASHBOARD_PASSWORD=choose-one npm run dev`.
 
 ## Refreshing the data
 Re-run the queries in `queries.sql` for the new latest week, rewrite `private/data-*.js`, run `npm run verify`, and update the week constants in `private/analytics.js` (`W`, `R12_START`, `PRIME`) and the six-month windows in `analytics.js` (`stability`, `shareChange`) and `app.js`.
+
+
+**Update:** prices are now the average selling price of all products (sales ÷ units), so they include promotions and move with product mix; share is share of sales ($), matching the CommerceIQ platform. 2026 YTD = 42 weeks from Dec 28, 2025 to Oct 11, 2026 (platform weeks). The same-product basket and tariff datasets were replaced by `private/data-weekly.js` (query M in `queries.sql`).

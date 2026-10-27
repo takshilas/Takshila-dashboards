@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "verify": "node scripts/verify-basket.mjs && node scripts/verify-r12.mjs && node scripts/verify-skus.mjs && node scripts/verify-prices.mjs"
+    "verify": "node scripts/verify-weekly.mjs && node scripts/verify-r12.mjs && node scripts/verify-skus.mjs && node scripts/verify-tier.mjs && node scripts/verify-prices.mjs"
   },
   "dependencies": {
     "next": "14.2.35",
