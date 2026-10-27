@@ -64,7 +64,7 @@
   function f1(v) { return v == null || !isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1); }
 
   function parse(D) {
-    var out = { wk: {}, r12: {}, skus: [], prices: {}, ladder: [], range: {}, skuall: [], skucov: {}, cmp: {}, asp: {}, tw: {}, ta: {}, tp: {}, ti: {}, el: [], tsk: {}, bw: {}, cnt: {} };
+    var out = { wk: {}, r12: {}, skus: [], prices: {}, ladder: [], range: {}, skuall: [], skucov: {}, cmp: {}, asp: {}, tw: {}, ta: {}, tp: {}, ti: {}, el: [], tsk: {}, bw: {}, cnt: {}, an: {} };
     D.weekly.forEach(function (r) { var p = r.split('|'); (out.wk[+p[0]] = out.wk[+p[0]] || {})[p[1]] = { s: nums(p[2]), u: nums(p[3]) }; });
     D.r12.forEach(function (r) {
       var p = r.split('|'), place = function (s) { var a = [], v = nums(s); for (var i = 0; i < 52; i++) a[R12_START + i] = v[i]; return a; };
@@ -99,7 +99,21 @@
     (D.tierpromo || []).forEach(function (r) { var p = r.split('|'), v = nums(p[3]); put(out.tp, p, { np: v[0] || 0, sp: v[1] || 0, nn: v[2] || 0, sn: v[3] || 0 }); });
     (D.tieridx || []).forEach(function (r) { var p = r.split('|'); put(out.ti, p, nums(p[3])); });
     (D.elast || []).forEach(function (r) { var p = r.split('|'), v = nums(p[3]); out.el.push({ cs: +p[0], gr: p[1], tr: +p[2], n: v[0], ne: v[1], S: v[2], Se: v[3], Swe: v[4], med: v[5], npos: v[6], nr: v[7], Sr: v[8], Swr: v[9] }); });
+    // Month anchors: for each selectable month, products and price sums for year to date, the same weeks a year earlier, the month and the month before.
+    var mo = null;
+    String(D.anchor || '').split('\n').forEach(function (l) {
+      if (!l) return; if (l.charAt(0) === '@') { mo = l.slice(1); return; }
+      var p = l.split('|'), a = out.an[mo] = out.an[mo] || {}, s = a[+p[0]] = a[+p[0]] || {}, t = s[p[1]] = s[p[1]] || {};
+      t[p[2]] = nums(p[3]);
+    });
     return out;
+  }
+
+  // Price windows [2024, 2025, prior-year YTD, YTD, previous month, month] as products and price sums: the two full years are fixed, the rest follow the month selected.
+  function anchored(M, si, t, b, base) {
+    var a = M.an && M.an[WIN.key] && M.an[WIN.key][si] && M.an[WIN.key][si][t] && M.an[WIN.key][si][t][b], v = base || [];
+    if (!a) return [v[0] || 0, v[1] || 0, v[2] || 0, v[3] || 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    return [v[0] || 0, v[1] || 0, v[2] || 0, v[3] || 0, a[2], a[3], a[0], a[1], a[6], a[7], a[4], a[5]];
   }
 
   // Average selling price of all products (sales / units, promotions included) as a weekly index, Oct to Dec 2024 (deal weeks left out) = 100.
@@ -199,10 +213,11 @@
     var ch = function (x, y) { return x != null && y ? (x / y - 1) * 100 : null; };
     var pr = function (v, k) { return v && v[2 * k] >= 3 ? v[2 * k + 1] / v[2 * k] : null; }; // simple average of product prices: sum / products (needs 3+ products)
     var one = function (b) {
-      var v = src[si] && src[si][b], d = wk[b]; if (!v || !d) return null;
+      var v0 = src[si] && src[si][b], d = wk[b]; if (!v0 || !d) return null;
+      var v = anchored(M, si, 'A', b, v0);
       var p24 = pr(v, 0), p25 = pr(v, 1), p25y = pr(v, 2), p26y = pr(v, 3), pSep = pr(v, 4), pOct = pr(v, 5);
-      var u = 0; for (var w = R12_START; w < W; w++) u += d.u[w] || 0;
-      return { brand: b, share: shareWeeks(M, si, b, range(R12_START, W - 1)), units: u, sh25: shareWeeks(M, si, b, range(12, 63)), sh26: shareWeeks(M, si, b, range(64, W - 1)),
+      var u = 0; WIN.y12.forEach(function (w) { u += d.u[w] || 0; });
+      return { brand: b, share: shareWeeks(M, si, b, WIN.y12), units: u, sh25: shareWeeks(M, si, b, WIN.py), sh26: shareWeeks(M, si, b, WIN.ytd),
         p25: p25, c25: ch(p25, p24), p26y: p26y, c26y: ch(p26y, p25y), pOct: pOct, cOct: ch(pOct, pSep), p24: p24, p25y: p25y, v: v };
     };
     var names = Object.keys(wk).filter(function (b) { return ['All competitors', 'Segment total'].indexOf(b) < 0 && src[si] && src[si][b]; });
@@ -339,7 +354,9 @@
   // Britax first, then the category's top 5 competitors in order of sales.
   function tierBrands(M, si) { return [BG].concat(brands(M, si).filter(function (b) { return b !== BG && b !== CG; })); }
   function tierPrice(M, si, t) {
-    var d = M.ta[si] && M.ta[si][t] || {}, B = d[BG], C = d[CG], cat = B && C ? B.map(function (x, i) { return (x || 0) + (C[i] || 0); }) : (C || B);
+    var d0 = M.ta[si] && M.ta[si][t] || {}, d = {}; Object.keys(d0).forEach(function (b) { d[b] = anchored(M, si, t, b, d0[b]); });
+    tierBrands(M, si).concat([BG, CG]).forEach(function (b) { if (!d[b]) d[b] = anchored(M, si, t, b, null); });
+    var B = d[BG], C = d[CG], cat = B && C ? B.map(function (x, i) { return (x || 0) + (C[i] || 0); }) : (C || B);
     var rows = tierBrands(M, si).map(function (b) { return { brand: b, r: tierPriceFrom(d[b]) }; }).concat([{ brand: CG, r: tierPriceFrom(C) }, { brand: 'Tier overall', r: tierPriceFrom(cat) }]);
     var base = rows[0].r.p26y;
     rows.forEach(function (x) { x.r.vsB = x.brand !== BG && x.r.p26y != null && base ? (x.r.p26y / base - 1) * 100 : null; });

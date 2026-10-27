@@ -29,6 +29,8 @@ Definitions: tariff period = Jan to Jun 2025. Prime events = June and October (P
 Local: `npm install`, then `DASHBOARD_PASSWORD=choose-one npm run dev`.
 
 ## Refreshing the data
+The month bar at the top picks the reporting month (default: the latest month). "Last 12 months" = 12 months ending in the selected month, "last quarter" = the 3 months ending then, YTD = January to the selected month; a week counts in the month it ends in. Share and sales numbers are computed from the weekly files; average prices by brand and tier use month anchors (`data-anchor-asp.js`). Promo, Prime-event price index, elasticity and key-product tables are still precomputed for the latest week and are flagged on the page when an earlier month is selected.
+
 Re-run the queries in `queries.sql` for the new latest week, rewrite `private/data-*.js`, run `npm run verify`, and update the week constants in `private/analytics.js` (`W`, `R12_START`, `PRIME`) and the six-month windows in `analytics.js` (`stability`, `shareChange`) and `app.js`.
 
 
