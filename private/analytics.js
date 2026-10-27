@@ -16,6 +16,38 @@
   var TARIFF = [13, 38]; // Jan to Jun 2025
   var BLACK_FRIDAY = [6, 7, 8, 59, 60];
 
+  // ---------- month selection ----------
+  // A week belongs to the month its Saturday (week-end date) falls in. Jan-Oct 2026 is then the 42 platform weeks of Dec 28, 2025 to Oct 11, 2026.
+  function endDate(i) { return new Date(FIRST + (i * 7 + 6) * 864e5); }
+  function monthOf(i) { var d = endDate(i); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }
+  function mKey(ix) { var m = ix % 12 + 1; return Math.floor(ix / 12) + '-' + (m < 10 ? '0' : '') + m; }
+  function mIdx(key) { var p = String(key).split('-'); return +p[0] * 12 + (+p[1] - 1); }
+  function mName(ix) { return new Date(Date.UTC(Math.floor(ix / 12), ix % 12, 1)).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }); }
+  function weeksBetween(a, b) { var o = []; for (var w = 0; w < W; w++) { var m = monthOf(w); if (m >= a && m <= b) o.push(w); } return o; }
+  var LATEST = monthOf(W - 1), FIRST_SELECTABLE = 2026 * 12;
+  var MONTHS = []; for (var mi = FIRST_SELECTABLE; mi <= LATEST; mi++) MONTHS.push(mKey(mi));
+  // Every window the dashboard uses, as lists of week indexes, for the month selected.
+  function win(key) {
+    var m = key ? mIdx(key) : LATEST; if (!(m <= LATEST)) m = LATEST; if (m < FIRST_SELECTABLE) m = FIRST_SELECTABLE;
+    var y = Math.floor(m / 12), jan = y * 12;
+    var o = { key: mKey(m), ix: m, label: mName(m), year: y,
+      month: weeksBetween(m, m), prev: weeksBetween(m - 1, m - 1), q: weeksBetween(m - 2, m), h: weeksBetween(m - 5, m), y12: weeksBetween(m - 11, m),
+      ytd: weeksBetween(jan, m), py: weeksBetween(jan - 12, jan - 1), q1: weeksBetween(jan, jan + 2).filter(function (w) { return w <= weeksBetween(m, m).slice(-1)[0]; }) };
+    o.pytd = o.ytd.map(function (w) { return w - 52; }).filter(function (w) { return w >= 0; }); // the same weeks one year (52 weeks) earlier
+    o.last = o.month[o.month.length - 1];
+    var next = new Date(endDate(o.last).getTime() + 7 * 864e5);
+    o.partial = m === LATEST && next.getUTCFullYear() * 12 + next.getUTCMonth() === m;
+    var d0 = new Date(Date.UTC(Math.floor(m / 12), m % 12, 1)), tot = 0; while (d0.getUTCMonth() === m % 12) { if (d0.getUTCDay() === 6) tot++; d0 = new Date(d0.getTime() + 864e5); }
+    o.total = tot; // week-ends (Saturdays) in the month
+    o.fromLabel = function (ws) { return wkLabel(ws[0]); };
+    o.range = function (ws) { return ws.length ? wkLabel(ws[0]) + ' to ' + wkLabel(ws[ws.length - 1]) + ' (' + ws.length + ' weeks)' : '—'; };
+    return o;
+  }
+  var WIN = win();
+  function setMonth(key) { WIN = win(key); return WIN; }
+  function current() { return WIN; }
+  function cleanWeeks(ws) { return ws.filter(function (w) { return !excluded(w); }); }
+
   function wkDate(i) { return new Date(FIRST + i * 7 * 864e5); }
   function wkIso(i) { return wkDate(i).toISOString().slice(0, 10); }
   function wkLabel(i) { return wkDate(i).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }); }
@@ -32,7 +64,7 @@
   function f1(v) { return v == null || !isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1); }
 
   function parse(D) {
-    var out = { wk: {}, r12: {}, skus: [], prices: {}, ladder: [], range: {}, skuall: [], skucov: {}, cmp: {}, asp: {}, tw: {}, ta: {}, tp: {}, ti: {}, el: [], tsk: {} };
+    var out = { wk: {}, r12: {}, skus: [], prices: {}, ladder: [], range: {}, skuall: [], skucov: {}, cmp: {}, asp: {}, tw: {}, ta: {}, tp: {}, ti: {}, el: [], tsk: {}, bw: {}, cnt: {} };
     D.weekly.forEach(function (r) { var p = r.split('|'); (out.wk[+p[0]] = out.wk[+p[0]] || {})[p[1]] = { s: nums(p[2]), u: nums(p[3]) }; });
     D.r12.forEach(function (r) {
       var p = r.split('|'), place = function (s) { var a = [], v = nums(s); for (var i = 0; i < 52; i++) a[R12_START + i] = v[i]; return a; };
@@ -62,6 +94,7 @@
       var p = r.split('|'), b = p[6].split(','), pr = []; nums(p[7]).forEach(function (v, i) { pr[R12_START + i] = v; });
       ((out.tsk[+p[0]] = out.tsk[+p[0]] || {})[+p[1]] = out.tsk[+p[0]][+p[1]] || []).push({ own: p[2] === 'B', asin: p[3], brand: p[4], title: p[5].trim(), base: +b[0], u13: +b[1], asp: +b[2], price: pr });
     });
+    (D.brandwk || []).forEach(function (r) { var p = r.split('|'), v = nums(p[2]), a = []; v.forEach(function (x, i) { a[12 + i] = x == null ? null : x * 100; }); (out.bw[+p[0]] = out.bw[+p[0]] || {})[p[1]] = a; });
     (D.tierasp || []).forEach(function (r) { var p = r.split('|'); put(out.ta, p, nums(p[3])); });
     (D.tierpromo || []).forEach(function (r) { var p = r.split('|'), v = nums(p[3]); put(out.tp, p, { np: v[0] || 0, sp: v[1] || 0, nn: v[2] || 0, sn: v[3] || 0 }); });
     (D.tieridx || []).forEach(function (r) { var p = r.split('|'); put(out.ti, p, nums(p[3])); });
@@ -211,13 +244,18 @@
   // 2026 year to date vs 2025: sales, share of the segment, and the change, for Britax group brands and the top competitors.
   // Sales change compares 2026 YTD with the same 41 weeks of 2025; share difference compares 2026 YTD share with full-year 2025 share.
   function compareRows(M, si) {
-    var c = M.cmp[si]; if (!c || !c.tot) return null;
-    var t = c.tot, rows = c.rows.map(function (r) {
-      return { own: r.own, brand: r.brand, s26: r.s26, s25: r.s25, s25b: r.s25b, n26: r.n26, n25: r.n25,
-        chg: r.s25b ? (r.s26 / r.s25b - 1) * 100 : null, sh26: r.s26 / t.s26 * 100, sh25: r.s25 / t.s25 * 100, sh25b: r.s25b / t.s25b * 100, d: r.s26 / t.s26 * 100 - r.s25 / t.s25 * 100 };
+    var bw = M.bw[si]; if (!bw) return null;
+    var tot = []; (si === 4 ? [0, 1, 2, 3] : [si]).forEach(function (k) { var t = M.wk[k] && M.wk[k][TG]; if (t) t.s.forEach(function (v, w) { if (v != null) tot[w] = (tot[w] || 0) + v; }); });
+    var sw = function (arr, ws) { var a = 0; ws.forEach(function (w) { if (arr[w] != null) a += arr[w]; }); return a; };
+    var cn = M.cnt && M.cnt[WIN.key] && M.cnt[WIN.key][si] || {};
+    var t = { s26: sw(tot, WIN.ytd), s25: sw(tot, WIN.py), s25b: sw(tot, WIN.pytd), n26: cn['All brands'] != null ? cn['All brands'] : null };
+    var rows = Object.keys(bw).map(function (b) {
+      var s26 = sw(bw[b], WIN.ytd), s25 = sw(bw[b], WIN.py), s25b = sw(bw[b], WIN.pytd);
+      return { own: b === 'Britax' || b === 'Bob Gear', brand: b, s26: s26, s25: s25, s25b: s25b, n26: cn[b] != null ? cn[b] : null,
+        chg: s25b ? (s26 / s25b - 1) * 100 : null, sh26: s26 / t.s26 * 100, sh25: s25 / t.s25 * 100, sh25b: s25b / t.s25b * 100, d: s26 / t.s26 * 100 - s25 / t.s25 * 100 };
     });
-    var sum = function (own, k) { return rows.filter(function (r) { return r.own === own; }).reduce(function (a, r) { return a + r[k]; }, 0); };
-    var group = function (own) { var o = { brand: own ? 'Britax group' : 'Top competitors', s26: sum(own, 's26'), s25: sum(own, 's25'), s25b: sum(own, 's25b'), n26: sum(own, 'n26'), n25: sum(own, 'n25') }; o.chg = o.s25b ? (o.s26 / o.s25b - 1) * 100 : null; o.sh26 = o.s26 / t.s26 * 100; o.sh25 = o.s25 / t.s25 * 100; o.d = o.sh26 - o.sh25; return o; };
+    var sum = function (own, k) { return rows.filter(function (r) { return r.own === own; }).reduce(function (a, r) { return a + (r[k] || 0); }, 0); };
+    var group = function (own) { var o = { brand: own ? 'Britax group' : 'Top competitors', s26: sum(own, 's26'), s25: sum(own, 's25'), s25b: sum(own, 's25b'), n26: sum(own, 'n26') }; o.chg = o.s25b ? (o.s26 / o.s25b - 1) * 100 : null; o.sh26 = o.s26 / t.s26 * 100; o.sh25 = o.s25 / t.s25 * 100; o.d = o.sh26 - o.sh25; return o; };
     var own = rows.filter(function (r) { return r.own; }).sort(function (a, b) { return b.s26 - a.s26; });
     var comps = rows.filter(function (r) { return !r.own; }).sort(function (a, b) { return b.s26 - a.s26; });
     return { own: own, comps: comps, britax: group(true), top: group(false), total: t, totalChg: t.s25b ? (t.s26 / t.s25b - 1) * 100 : null };
@@ -234,8 +272,7 @@
   function shareOver(M, si, brand, lo, hi) { return shareWeeks(M, si, brand, range(lo, hi)); }
   // Share change over six months (clean weeks) and around each Prime event inside the window.
   function shareChange(M, si, brand) {
-    var ok = function (lo, hi) { return range(lo, hi).filter(function (w) { return !excluded(w); }); };
-    var s0 = shareWeeks(M, si, brand, ok(80, 85)), s1 = shareWeeks(M, si, brand, ok(96, 101));
+    var c = cleanWeeks(WIN.h), s0 = shareWeeks(M, si, brand, c.slice(0, 6)), s1 = shareWeeks(M, si, brand, c.slice(-6));
     return { was: s0, now: s1, d: s0 != null && s1 != null ? s1 - s0 : null };
   }
   function shareEvent(M, si, brand, e) {
@@ -282,12 +319,11 @@
   // Share of sales in a tier: group sales / sales of every tracked brand in the tier.
   function tierShare(M, si, t, g, weeks) { var a = tsum(M, si, t, g, weeks, 's'), b = tsum(M, si, t, TG, weeks, 's'); return a != null && b ? a / b * 100 : null; }
   function tierShareSeries(M, si, t, g) { var o = []; for (var w = 0; w < W; w++) o[w] = w < 12 ? null : tierShare(M, si, t, g, [w]); return o; }
-  var Y26W = range(64, W - 1), Y25W = range(12, 63), Y25B = range(12, 53);
   // Where is the loss: Britax sales and share by tier, 2026 YTD vs 2025.
   function tierOverview(M, si) {
     var rows = [0, 1, 2].map(function (t) {
-      var c26 = tsum(M, si, t, TG, Y26W, 's'), c25b = tsum(M, si, t, TG, Y25B, 's'), b26 = tsum(M, si, t, BG, Y26W, 's'), b25b = tsum(M, si, t, BG, Y25B, 's');
-      var sh25 = tierShare(M, si, t, BG, Y25W), sh26 = tierShare(M, si, t, BG, Y26W), d = sh25 != null && sh26 != null ? sh26 - sh25 : null;
+      var c26 = tsum(M, si, t, TG, WIN.ytd, 's'), c25b = tsum(M, si, t, TG, WIN.pytd, 's'), b26 = tsum(M, si, t, BG, WIN.ytd, 's'), b25b = tsum(M, si, t, BG, WIN.pytd, 's');
+      var sh25 = tierShare(M, si, t, BG, WIN.py), sh26 = tierShare(M, si, t, BG, WIN.ytd), d = sh25 != null && sh26 != null ? sh26 - sh25 : null;
       return { t: t, label: tierLabel(si, t), c26: c26, catChg: c25b ? (c26 / c25b - 1) * 100 : null, b26: b26, b25b: b25b, bChg: b25b > 0 ? (b26 / b25b - 1) * 100 : null, sh25: sh25, sh26: sh26, d: d, impact: d != null && c26 ? d / 100 * c26 : null };
     });
     var tot = rows.reduce(function (a, r) { return a + r.c26; }, 0);
@@ -320,19 +356,18 @@
   }
   // Share of sales by tier for Britax and each top competitor, 2026 YTD vs 2025.
   function tierBrandShare(M, si, t, g) {
-    var sh25 = tierShare(M, si, t, g, Y25W), sh26 = tierShare(M, si, t, g, Y26W);
+    var sh25 = tierShare(M, si, t, g, WIN.py), sh26 = tierShare(M, si, t, g, WIN.ytd);
     return { sh25: sh25, sh26: sh26, d: sh25 != null && sh26 != null ? sh26 - sh25 : null };
   }
   // Share in Prime weeks vs other weeks, 2026 year to date, for one group in one tier.
   function tierPrimeVs(M, si, t, g) {
-    var all = [], prime = [], other = [], f13 = [], l13 = [];
-    for (var k = 64; k < W; k++) { all.push(k); (PRIME.some(function (e) { return Math.abs(e.week - k) <= 1; }) ? prime : other).push(k); if (k < 64 + 13) f13.push(k); if (k > W - 14) l13.push(k); }
-    var a = tierShare(M, si, t, g, all), p = tierShare(M, si, t, g, prime), o = tierShare(M, si, t, g, other), f = tierShare(M, si, t, g, f13), l = tierShare(M, si, t, g, l13);
+    var all = WIN.ytd, prime = [], other = [];
+    all.forEach(function (k) { (PRIME.some(function (e) { return Math.abs(e.week - k) <= 1; }) ? prime : other).push(k); });
+    var a = tierShare(M, si, t, g, all), p = tierShare(M, si, t, g, prime), o = tierShare(M, si, t, g, other), f = tierShare(M, si, t, g, WIN.q1), l = tierShare(M, si, t, g, WIN.q);
     return { a: a, p: p, o: o, lift: p != null && o != null ? p - o : null, f: f, l: l, d: f != null && l != null ? l - f : null };
   }
   function tierChange(M, si, t, g) {
-    var ok = function (lo, hi) { return range(lo, hi).filter(function (w) { return !excluded(w); }); };
-    var s0 = tierShare(M, si, t, g, ok(80, 85)), s1 = tierShare(M, si, t, g, ok(96, 101));
+    var c = cleanWeeks(WIN.h), s0 = tierShare(M, si, t, g, c.slice(0, 6)), s1 = tierShare(M, si, t, g, c.slice(-6));
     return { was: s0, now: s1, d: s0 != null && s1 != null ? s1 - s0 : null };
   }
   function tierEvent(M, si, t, g, e) {
@@ -350,7 +385,7 @@
   var api = { W: W, R12_START: R12_START, SEGMENTS: SEGMENTS, CORE: CORE, PRIME: PRIME, TARIFF: TARIFF,
     wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, primeWeek: primeWeek, excluded: excluded, f1: f1, avg: avg,
     parse: parse, trendSeries: trendSeries, findMoves: findMoves, stability: stability, tariffRow: tariffRow, brands: brands,
-    promoStats: promoStats, compareRows: compareRows, priceRows: priceRows, promoPrices: promoPrices, skuAll: skuAll, shareWeeks: shareWeeks, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows, tierSkuRows: tierSkuRows,
+    promoStats: promoStats, win: current, setMonth: setMonth, monthName: function (k) { return mName(mIdx(k)); }, MONTHS: MONTHS, mName: mName, mKey: mKey, cleanWeeks: cleanWeeks, compareRows: compareRows, priceRows: priceRows, promoPrices: promoPrices, skuAll: skuAll, shareWeeks: shareWeeks, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows, tierSkuRows: tierSkuRows,
     TIER_NAMES: TIER_NAMES, tierRange: tierRange, tierLabel: tierLabel, tierShare: tierShare, tierShareSeries: tierShareSeries, tierOverview: tierOverview, tierPrice: tierPrice, tierPromo: tierPromo, tierBrands: tierBrands, tierBrandShare: tierBrandShare, tierPrimeVs: tierPrimeVs, tierChange: tierChange, tierEvent: tierEvent,
     elastRows: elastRows, elastStat: elastStat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.BritaxAnalytics = api;

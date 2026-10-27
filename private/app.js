@@ -1,7 +1,8 @@
 // Britax US pricing and share dashboard. Renders from precomputed tables (private/data-*.js); nothing is queried in the browser.
 (function () {
   var A = window.BritaxAnalytics;
-  var M = A.parse({ weekly: window.BRITAX_WEEKLY, r12: window.BRITAX_R12, prices: window.BRITAX_PRICES, skuall: window.BRITAX_SKUALL, skucov: window.BRITAX_SKUCOV, cmp: window.BRITAX_CMP, cmptot: window.BRITAX_CMPTOT, asp: window.BRITAX_ASP, tierwk: window.BRITAX_TIERWK, tierskus: window.BRITAX_TIERSKUS, tierasp: window.BRITAX_TIERASP, tierpromo: window.BRITAX_TIERPROMO, tierbrwk: window.BRITAX_TIERBR_WK, tierbrasp: window.BRITAX_TIERBR_ASP, tierbrpromo: window.BRITAX_TIERBR_PROMO, tierbridx: window.BRITAX_TIERBR_IDX, tieridx: window.BRITAX_TIERIDX, elast: window.BRITAX_ELAST });
+  var M = A.parse({ weekly: window.BRITAX_WEEKLY, r12: window.BRITAX_R12, prices: window.BRITAX_PRICES, skuall: window.BRITAX_SKUALL, skucov: window.BRITAX_SKUCOV, brandwk: window.BRITAX_BRANDWK, asp: window.BRITAX_ASP, tierwk: window.BRITAX_TIERWK, tierskus: window.BRITAX_TIERSKUS, tierasp: window.BRITAX_TIERASP, tierpromo: window.BRITAX_TIERPROMO, tierbrwk: window.BRITAX_TIERBR_WK, tierbrasp: window.BRITAX_TIERBR_ASP, tierbrpromo: window.BRITAX_TIERBR_PROMO, tierbridx: window.BRITAX_TIERBR_IDX, tieridx: window.BRITAX_TIERIDX, elast: window.BRITAX_ELAST });
+  var Y = 2026, PY = 2025; // selected year and the year before
   var P6 = 80; // first week of the 6-month promo window (week of Apr 19, 2026)
   var SEG = A.SEGMENTS, CORE = A.CORE, PRIME = A.PRIME, W = A.W, f1 = A.f1, R0 = A.R12_START, LAST = W - 1;
   var $ = function (id) { return document.getElementById(id); };
@@ -26,10 +27,19 @@
   ];
   var q = new URLSearchParams(location.search);
   function clampInt(v, lo, hi, d) { var n = parseInt(v, 10); return isNaN(n) ? d : Math.max(lo, Math.min(hi, n)); }
-  var state = { lvl: 'brand', view: VIEWS.some(function (v) { return v.id === q.get('view'); }) ? q.get('view') : 'summary', seg: clampInt(q.get('seg'), 0, 4, 0), overlay: {}, tierBrand: 'Britax group' };
-  function sync() { history.replaceState(null, '', '?view=' + state.view + '&seg=' + state.seg + location.hash); }
+  var state = { lvl: 'brand', view: VIEWS.some(function (v) { return v.id === q.get('view'); }) ? q.get('view') : 'summary', seg: clampInt(q.get('seg'), 0, 4, 0), overlay: {}, tierBrand: 'Britax group', month: A.MONTHS.indexOf(q.get('m')) >= 0 ? q.get('m') : A.MONTHS[A.MONTHS.length - 1] };
+  var Wd = A.win(); // windows for the selected month; refreshed by useMonth() before every render
+  function useMonth() { A.setMonth(state.month); Wd = A.win(); R0 = Wd.y12[0]; LAST = Wd.last; P6 = Wd.h[0]; Y = Wd.year; PY = Wd.year - 1; }
+  function sync() { history.replaceState(null, '', '?view=' + state.view + '&seg=' + state.seg + '&m=' + state.month + location.hash); }
 
-  $('asof').innerHTML = 'Amazon US · weekly Market Share estimates · data through week of <b>' + A.wkIso(LAST) + '</b> · tariff period Jan–Jun 2025 · Prime events: June and October';
+  function drawMonth() {
+    var sel = $('monthSel');
+    sel.innerHTML = A.MONTHS.slice().reverse().map(function (m) { return '<option value="' + m + '"' + (m === state.month ? ' selected' : '') + '>' + esc(A.monthName(m)) + '</option>'; }).join('');
+    sel.onchange = function () { state.month = this.value; render(); };
+    var yr = Wd.year;
+    $('asof').innerHTML = 'Amazon US · weekly Market Share estimates · data through week of <b>' + A.wkIso(A.W - 1) + '</b> · tariff period Jan–Jun 2025 · Prime events: June and October';
+    $('monthNote').innerHTML = (Wd.partial ? '<b>' + esc(Wd.label) + ' is partial</b>: ' + Wd.month.length + ' of ' + Wd.total + ' weeks so far (through the week of ' + A.wkLabel(Wd.last) + '). ' : '') + 'Last 12 months = ' + esc(A.monthName(A.mKey(Wd.ix - 11))) + ' to ' + esc(Wd.label) + ' · last quarter = ' + esc(A.monthName(A.mKey(Wd.ix - 2))) + ' to ' + esc(Wd.label) + ' · ' + yr + ' YTD = ' + (Wd.label.split(' ')[0] === 'Jan' ? 'Jan' : 'Jan to ' + esc(Wd.label.split(' ')[0])) + ' (' + Wd.ytd.length + ' weeks). A week counts in the month it ends in.';
+  }
 
   // ---------- tabs ----------
   function drawTabs() {
@@ -157,17 +167,10 @@
     var si = state.seg, all = A.brands(M, si), rows = {};
     all.forEach(function (b) {
       var t = A.trendSeries(M, si, b);
-      rows[b] = { brand: b, t: t, st: A.stability(M, si, b), tr: A.tariffRow(M, si, b), moves: A.findMoves(t.vals) };
+      rows[b] = { brand: b, t: t, moves: A.findMoves(t.vals) };
     });
     var comps = all.filter(function (b) { return !isGroup(b); });
     var bx = rows['Britax group'], cx = rows['All competitors'];
-    var stableNames = comps.filter(function (b) { return rows[b].st && /^Stable/.test(rows[b].st.status); });
-    var raised = comps.filter(function (b) { return rows[b].tr && rows[b].tr.rise != null && rows[b].tr.rise >= 5; });
-    var movedNow = comps.filter(function (b) { return rows[b].st && (rows[b].st.status === 'Raised' || rows[b].st.status === 'Cut'); });
-    var ans = '<div class="answer">';
-    ans += '<p><b>Who raised price?</b> ' + (raised.length ? raised.map(function (b) { return esc(b) + ' ' + sgn(rows[b].tr.rise, 0); }).join(', ') + ' (average selling price, Jan to Jun 2025).' : 'No tracked competitor raised price by 5% or more over Jan to Jun 2025 (average selling price of all products).') + (bx.tr && bx.tr.rise != null ? ' Britax: ' + sgn(bx.tr.rise, 0) + '.' : '') + '</p>';
-    ans += '<p><b>Stable in the last 6 months (Prime weeks excluded):</b> ' + (stableNames.length ? stableNames.map(function (b) { return esc(b) + (rows[b].st.status === 'Stable' ? '' : ' (promotes often)'); }).join(', ') : 'none') + '. <b>Still moving:</b> ' + (movedNow.length ? movedNow.map(function (b) { return esc(b) + ' ' + sgn(rows[b].st.net, 0); }).join(', ') : 'none') + '.</p>';
-    ans += '<p><b>Britax:</b> ' + (bx.st ? statusPill(bx.st.status) + ' (' + sgn(bx.st.net) + ' over 6 months) vs all competitors combined ' + sgn(cx.st && cx.st.net) + '.' : 'No read.') + '</p></div>';
 
     var series = [
       { name: 'Britax (incl. Bob Gear)', color: BRITAX, bold: true, vals: bx.t.vals, moves: bx.moves.filter(function (m) { return m.week >= 5; }) },
@@ -176,7 +179,7 @@
     comps.forEach(function (b, i) { if (state.overlay[b]) series.push({ name: b, color: COLORS[i % COLORS.length], vals: rows[b].t.vals, moves: rows[b].moves }); });
     var cOpts = { lo: 0, hi: LAST, series: series, tariff: true, base: 100, aria: 'Weekly average selling price index', unit: '' };
 
-    var h = '<section class="card"><h2>Who raised price, and who is stable now</h2><p class="sub">' + esc(SEG[si]) + '</p>' + ans;
+    var h = '<section class="card"><h2>Who raised price, and who is stable now</h2><p class="sub">' + esc(SEG[si]) + '</p>';
     h += '<h3>Average selling price index, all products (Oct–Dec 2024 = 100)</h3>';
     h += legend([sw(BRITAX, 'Britax'), sw(COMP_ALL, 'All competitors combined'), '<span><span class="sw" style="background:#EAF4FF;border:1px solid #cfe3f7"></span>Tariff period Jan–Jun 2025</span>', primeKey, '<span>▲ ▼ price move of 5% or more</span>']);
     h += comps.length ? '<div class="legend">Add a competitor: ' + comps.map(function (b, i) { return '<label><input type="checkbox" data-ov="' + esc(b) + '"' + (state.overlay[b] ? ' checked' : '') + '> <span style="color:' + COLORS[i % COLORS.length] + '">●</span> ' + esc(b) + '</label>'; }).join('') + '</div>' : '';
@@ -286,20 +289,19 @@
   function viewMarket() {
     var si = state.seg;
     var bs = A.brands(M, si).filter(function (b) { return b !== 'All competitors'; });
-    var bx = M.r12[si]['Britax group'].idx, extra = [];
-    for (var w = R0; w <= LAST; w++) if (fin(bx[w]) && bx[w] <= 95 && !A.primeWeek(w)) extra.push(w);
+    var bx = (M.r12[si] && M.r12[si]['Britax group'] ? M.r12[si]['Britax group'].idx : []), extra = [];
+    if (state.month === A.MONTHS[A.MONTHS.length - 1]) for (var w = R0; w <= LAST; w++) if (fin(bx[w]) && bx[w] <= 95 && !A.primeWeek(w)) extra.push(w);
     var series = bs.map(function (b, i) { return { name: shortName(b), color: b === 'Britax group' ? BRITAX : COLORS[i % COLORS.length], bold: b === 'Britax group', vals: A.shareSeries(M, si, b) }; });
     var cOpts = { lo: R0, hi: LAST, series: series, aria: 'Weekly share of sales, last 12 months', unit: '%', floor0: true, extra: extra };
-    var h = '<section class="card"><h2>Market share, last 12 months</h2><p class="sub">' + esc(SEG[si]) + ' · weekly share of sales ($) among tracked brands. Purple bands are Prime event weeks; orange bands are other weeks when Britax itself was on promotion (5% or more below its 12-month baseline).</p>';
+    var h = '<section class="card"><h2>Market share, last 12 months</h2><p class="sub">' + esc(SEG[si]) + ' · ' + esc(A.monthName(A.mKey(Wd.ix - 11))) + ' to ' + esc(Wd.label) + ' · weekly share of sales ($) among tracked brands. Purple bands are Prime event weeks; orange bands are other weeks when Britax itself was on promotion (5% or more below its 12-month baseline).</p>';
     h += legend(series.map(function (s) { return sw(s.color, esc(s.name)); }).concat([primeKey, '<span><span class="sw" style="background:#F79009;opacity:.3"></span>Britax on promo (non-Prime)</span>']));
     h += lineChart('c3', cOpts) + '</section>';
-    h += '<section class="card"><h2>Share in Prime weeks vs other weeks</h2><p class="sub">' + esc(SEG[si]) + ' · 2026 year to date only (weeks of Dec 28, 2025 to Oct 11, 2026), share of sales ($) among tracked brands. Prime weeks = the event week plus the week before and after, for Prime Day in June and Prime Big Deal Days in October.</p><div class="scroll"><table class="tbl" id="t11"></table></div>' + csvBtn('t11') + '' + tierHtml('vs', si) + '</section>';
+    h += '<section class="card"><h2>Share in Prime weeks vs other weeks</h2><p class="sub">' + esc(SEG[si]) + ' · ' + Wd.year + ' year to date only (weeks of ' + Wd.range(Wd.ytd) + '), share of sales ($) among tracked brands. Prime weeks = the event week plus the week before and after, for Prime Day in June and Prime Big Deal Days in October.</p><div class="scroll"><table class="tbl" id="t11"></table></div>' + csvBtn('t11') + '' + tierHtml('vs', si) + '</section>';
     $('view').innerHTML = h;
     drawTierTables(si);
     wireTip('c3', cOpts);
-    var all = [], prime = [], other = [], f13 = [], l13 = [];
-    var Y26 = 64; // first platform 2026 week (week of Dec 28, 2025)
-    for (var k = Y26; k <= LAST; k++) { all.push(k); (A.PRIME.some(function (e) { return Math.abs(e.week - k) <= 1; }) ? prime : other).push(k); if (k < Y26 + 13) f13.push(k); if (k > LAST - 13) l13.push(k); }
+    var all = Wd.ytd, prime = [], other = [], f13 = Wd.q1, l13 = Wd.q;
+    all.forEach(function (k) { (A.PRIME.some(function (e) { return Math.abs(e.week - k) <= 1; }) ? prime : other).push(k); });
     var rows = bs.map(function (b) {
       var a = A.shareWeeks(M, si, b, all), p = A.shareWeeks(M, si, b, prime), o = A.shareWeeks(M, si, b, other), f = A.shareWeeks(M, si, b, f13), l = A.shareWeeks(M, si, b, l13);
       return { _cls: b === 'Britax group' ? 'me' : '', brand: shortName(b), a: a, p: p, o: o, lift: p != null && o != null ? p - o : null, f: f, l: l, d: f != null && l != null ? l - f : null };
@@ -308,12 +310,12 @@
     var pts2 = function (k) { return function (r) { return '<b class="' + gcls(r[k]) + '">' + pts(r[k]) + '</b>'; }; };
     table($('t11'), 't11', [
       { key: 'brand', label: 'Brand', l: 1 },
-      { key: 'a', label: '2026 YTD share', render: pc('a') },
+      { key: 'a', label: Wd.year + ' YTD share', render: pc('a') },
       { key: 'o', label: 'Other weeks', render: pc('o') },
       { key: 'p', label: 'Prime weeks', render: pc('p') },
       { key: 'lift', label: 'Prime weeks vs other', render: pts2('lift'), csv: function (r) { return r.lift; } },
-      { key: 'f', label: 'First 13 weeks of 2026', render: pc('f') },
-      { key: 'l', label: 'Last 13 weeks', render: pc('l') },
+      { key: 'f', label: 'First quarter of ' + Wd.year, render: pc('f') },
+      { key: 'l', label: 'Last quarter', render: pc('l') },
       { key: 'd', label: 'Change', render: pts2('d'), csv: function (r) { return r.d; } }
     ], rows);
   }
@@ -358,18 +360,18 @@
   }
   function viewShare() {
     var si = state.seg, bs = A.brands(M, si).filter(function (b) { return b !== 'All competitors'; });
-    var LO = 80, ss = {}; bs.forEach(function (b) { ss[b] = A.shareSeries(M, si, b); });
+    var LO = Wd.h[0], cw = A.cleanWeeks(Wd.h), f6 = cw.slice(0, 6), l6 = cw.slice(-6), ss = {}; bs.forEach(function (b) { ss[b] = A.shareSeries(M, si, b); });
     var chg = bs.map(function (b) { var c = A.shareChange(M, si, b); return { _cls: b === 'Britax group' ? 'me' : '', brand: shortName(b), was: c.was, now: c.now, d: c.d }; });
     var gainers = chg.filter(function (r) { return r.brand.indexOf('Britax') < 0 && fin(r.d) && r.d >= 0.3; }).sort(function (a, b) { return b.d - a.d; });
     var bc = chg.filter(function (r) { return r.brand.indexOf('Britax') === 0; })[0];
     var series = bs.map(function (b, i) { return { name: shortName(b), color: b === 'Britax group' ? BRITAX : COLORS[i % COLORS.length], bold: b === 'Britax group', vals: ss[b] }; }).filter(function (s) { return s.vals.slice(LO).some(fin); });
-    var h = '<section class="card"><h2>Share around Prime days</h2><p class="sub">' + esc(SEG[si]) + ' · share of sales ($) among tracked brands in the category, weekly, last 6 months</p>';
+    var h = '<section class="card"><h2>Share around Prime days</h2><p class="sub">' + esc(SEG[si]) + ' · share of sales ($) among tracked brands in the category, weekly, last 6 months (' + esc(A.monthName(A.mKey(Wd.ix - 5))) + ' to ' + esc(Wd.label) + ')</p>';
     h += '<div class="answer"><p><b>Britax:</b> ' + (bc ? f1(bc.was) + '% → ' + f1(bc.now) + '% (' + pts(bc.d) + ') between the first and last six clean weeks.' : 'No read.') + ' <b>Gaining share:</b> ' + (gainers.length ? gainers.slice(0, 3).map(function (r) { return esc(r.brand) + ' ' + pts(r.d); }).join(', ') : 'no competitor gained 0.3 pts or more') + '.</p></div>';
     var cOpts = { lo: LO, hi: LAST, series: series, aria: 'Weekly share of sales', unit: '%', floor0: true };
     h += legend(series.map(function (s) { return sw(s.color, esc(s.name)); }).concat([primeKey]));
     h += lineChart('c2', cOpts) + tierHtml('chart', si) + '</section>';
-    h += '<section class="card"><h2>Six-month change</h2><p class="sub">Average share in weeks of ' + A.wkLabel(80) + '–' + A.wkLabel(85) + ' vs ' + A.wkLabel(96) + '–' + A.wkLabel(101) + ', Prime weeks left out.</p><div class="scroll"><table class="tbl" id="t8"></table></div>' + csvBtn('t8') + '' + tierHtml('change', si) + '</section>';
-    PRIME.filter(function (e) { return e.week >= LO; }).forEach(function (e, i) {
+    h += '<section class="card"><h2>Six-month change</h2><p class="sub">Average share in the first six weeks of the last six months (' + A.wkLabel(f6[0]) + ' to ' + A.wkLabel(f6[f6.length - 1]) + ') vs the latest six (' + A.wkLabel(l6[0]) + ' to ' + A.wkLabel(l6[l6.length - 1]) + '), Prime and Black Friday weeks left out.</p><div class="scroll"><table class="tbl" id="t8"></table></div>' + csvBtn('t8') + '' + tierHtml('change', si) + '</section>';
+    PRIME.filter(function (e) { return e.week >= LO && e.week <= LAST; }).forEach(function (e, i) {
       var prov = e.week + 3 > LAST;
       h += '<section class="card"><h2>' + esc(e.label) + '</h2><p class="sub">Promo columns: price in the event week vs each brand’s 12-month baseline; on promo = 5% or more below. Before = 3 weeks before the event · during = event week · after = ' + (prov ? 'the week after (provisional: later weeks are not in yet)' : 'the 3 weeks after') + '</p><div class="scroll"><table class="tbl" id="te' + i + '"></table></div>' + csvBtn('te' + i) + tierHtml('event', si, i) + '</section>';
     });
@@ -379,7 +381,7 @@
     var pc = function (k) { return { key: k, label: k, render: function (r) { return fin(r[k]) ? f1(r[k]) + '%' : '—'; }, csv: function (r) { return r[k]; } }; };
     table($('t8'), 't8', [{ key: 'brand', label: 'Brand', l: 1 }, { key: 'was', label: 'Earlier', render: function (r) { return fin(r.was) ? f1(r.was) + '%' : '—'; } }, { key: 'now', label: 'Latest', render: function (r) { return fin(r.now) ? f1(r.now) + '%' : '—'; } },
       { key: 'd', label: 'Change', render: function (r) { return '<b class="' + gcls(r.d) + '">' + pts(r.d) + '</b>'; }, csv: function (r) { return r.d; } }], chg);
-    PRIME.filter(function (e) { return e.week >= LO; }).forEach(function (e, i) {
+    PRIME.filter(function (e) { return e.week >= LO && e.week <= LAST; }).forEach(function (e, i) {
       var rows = bs.map(function (b) { var s = A.shareEvent(M, si, b, e.week); return { _cls: b === 'Britax group' ? 'me' : '', brand: shortName(b), before: s.before, during: s.during, after: s.after, dd: s.dDuring, da: s.after == null ? null : s.dAfter, ix: M.r12[si][b].idx[e.week] }; });
       table($('te' + i), 'te' + i, [{ key: 'brand', label: 'Brand', l: 1 },
         { key: 'before', label: 'Before', render: function (r) { return fin(r.before) ? f1(r.before) + '%' : '—'; } },
@@ -401,11 +403,11 @@
   var tgname = function (g) { return g === 'Britax group' ? 'Britax (incl. Bob Gear)' : g; };
   // Each block is closed by default; tables and the chart inside are filled by drawTierTables() once the card is on the page.
   function tierHtml(kind, si, i) {
-    var intro = '<p class="sub">' + esc(SEG[si]) + ' · price tiers, set by each product’s own average price since Jan 2024 (about a third of the category’s 2026 YTD sales in each): ' + tierNote(si) + '.</p>', body = '';
+    var intro = '<p class="sub">' + esc(SEG[si]) + ' · price tiers, set by each product’s own average price since Jan 2024 (about a third of the category’s ' + Y + ' YTD sales in each): ' + tierNote(si) + '.</p>', body = '';
     if (kind === 'price') body = '<p class="sub">Simple average across products (each counts once, promotions included): Britax, each top competitor, all competitors and every tracked product in the tier.</p><div class="scroll"><table class="tbl" id="tt2"></table></div>' + csvBtn('tt2') + '<p class="rule">Competitors shown are the category’s top 5 by sales; “All competitors” covers every tracked competitor brand. A dash means fewer than 3 products sold in the period. Price vs Britax compares 2026 YTD prices.</p>';
     else if (kind === 'promo') body = '<p class="sub">Last 6 months, simple average across products; a product is on promotion in a week when its price is 5% or more below its own 52-week median.</p><div class="scroll"><table class="tbl" id="tt3"></table></div>' + csvBtn('tt3') + '<p class="rule">A dash means fewer than 3 products with promoted (or non-promoted) weeks. The two groups can contain different products.</p>';
-    else if (kind === 'vs') body = '<p class="sub">Where is the loss? Britax sales and share of sales by tier, 2026 YTD vs 2025.</p><div class="scroll"><table class="tbl" id="tt1"></table></div>' + csvBtn('tt1') + '<p class="sub">Share of sales within each tier: Britax and each top competitor, 2026 YTD vs 2025.</p><div class="scroll"><table class="tbl" id="tt1b"></table></div>' + csvBtn('tt1b') + '<p class="rule">Share = Britax group sales ÷ sales of every tracked brand in the same tier (2026 YTD = weeks of Dec 28, 2025 to Oct 11, 2026; 2025 = Dec 29, 2024 to Dec 21, 2025). Sales change compares 2026 YTD with the same 42 weeks of 2025. Sales effect of share change = share change × the tier’s 2026 YTD category sales. Where Britax sells few products in a tier, read share moves with care.</p>'
-      + '<p class="sub">Share in Prime weeks vs other weeks, 2026 YTD, Britax and each top competitor within each tier.</p><div class="scroll"><table class="tbl" id="tt4"></table></div>' + csvBtn('tt4');
+    else if (kind === 'vs') body = '<p class="sub">Where is the loss? Britax sales and share of sales by tier, ' + Y + ' YTD vs ' + PY + '.</p><div class="scroll"><table class="tbl" id="tt1"></table></div>' + csvBtn('tt1') + '<p class="sub">Share of sales within each tier: Britax and each top competitor, ' + Y + ' YTD vs ' + PY + '.</p><div class="scroll"><table class="tbl" id="tt1b"></table></div>' + csvBtn('tt1b') + '<p class="rule">Share = Britax group sales ÷ sales of every tracked brand in the same tier (' + Y + ' YTD = weeks of ' + Wd.range(Wd.ytd) + '; ' + PY + ' = weeks of ' + Wd.range(Wd.py) + '). Sales change compares ' + Y + ' YTD with the same weeks of ' + PY + '. Sales effect of share change = share change × the tier’s ' + Y + ' YTD category sales. Where Britax sells few products in a tier, read share moves with care.</p>'
+      + '<p class="sub">Share in Prime weeks vs other weeks, ' + Y + ' YTD, Britax and each top competitor within each tier.</p><div class="scroll"><table class="tbl" id="tt4"></table></div>' + csvBtn('tt4');
     else if (kind === 'chart') body = '<p class="sub">Share of sales within each tier, weekly, last 6 months.</p><div class="controls"><label>Brand <select id="tierBrand">' + A.tierBrands(M, si).map(function (b) { return '<option value="' + esc(b) + '"' + (b === state.tierBrand ? ' selected' : '') + '>' + esc(tgname(b)) + '</option>'; }).join('') + '</select></label></div>' + legend([0, 1, 2].map(function (t) { return sw(TIER_COLORS[t], A.TIER_NAMES[t]); }).concat([primeKey])) + '<div id="ct1box">' + lineChart('ct1', tierChartOpts(si)) + '</div>';
     else if (kind === 'change') body = '<div class="scroll"><table class="tbl" id="tt5"></table></div>' + csvBtn('tt5');
     else if (kind === 'event') body = '<div class="scroll"><table class="tbl" id="tt-e' + i + '"></table></div>' + csvBtn('tt-e' + i);
@@ -414,7 +416,7 @@
   function tierChartOpts(si) {
     var g = A.tierBrands(M, si).indexOf(state.tierBrand) >= 0 ? state.tierBrand : 'Britax group';
     var series = [0, 1, 2].map(function (t) { return { name: tgname(g) + ' · ' + A.TIER_NAMES[t] + ' tier', color: TIER_COLORS[t], bold: true, vals: A.tierShareSeries(M, si, t, g) }; });
-    return { lo: 80, hi: LAST, series: series.filter(function (s) { return s.vals.slice(80).some(fin); }), aria: 'Weekly share of sales by price tier', unit: '%', floor0: true };
+    return { lo: Wd.h[0], hi: LAST, series: series.filter(function (s) { return s.vals.slice(Wd.h[0]).some(fin); }), aria: 'Weekly share of sales by price tier', unit: '%', floor0: true };
   }
   function drawTierTables(si) {
     var pcf = function (k) { return function (r) { return fin(r[k]) ? f1(r[k]) + '%' : '—'; }; };
@@ -434,11 +436,11 @@
       table($('tt1'), 'tt1', [
         { key: 'label', label: 'Price tier', l: 1 },
         { key: 'mix', label: 'Tier share of category sales', render: pcf('mix'), csv: csvs('mix') },
-        { key: 'catChg', label: 'Category sales vs same weeks 2025', render: chgc('catChg', 0), csv: csvs('catChg') },
-        { key: 'b26', label: 'Britax sales, 2026 YTD', render: function (r) { return usdM(r.b26); }, csv: csvs('b26') },
-        { key: 'bChg', label: 'Britax sales vs same weeks 2025', render: chgc('bChg', 0), csv: csvs('bChg') },
-        { key: 'sh25', label: 'Britax share, 2025', render: function (r) { return fin(r.sh25) ? r.sh25.toFixed(2) + '%' : '—'; }, csv: csvs('sh25') },
-        { key: 'sh26', label: 'Britax share, 2026 YTD', render: function (r) { return fin(r.sh26) ? r.sh26.toFixed(2) + '%' : '—'; }, csv: csvs('sh26') },
+        { key: 'catChg', label: 'Category sales vs same weeks ' + PY, render: chgc('catChg', 0), csv: csvs('catChg') },
+        { key: 'b26', label: 'Britax sales, ' + Y + ' YTD', render: function (r) { return usdM(r.b26); }, csv: csvs('b26') },
+        { key: 'bChg', label: 'Britax sales vs same weeks ' + PY, render: chgc('bChg', 0), csv: csvs('bChg') },
+        { key: 'sh25', label: 'Britax share, ' + PY, render: function (r) { return fin(r.sh25) ? r.sh25.toFixed(2) + '%' : '—'; }, csv: csvs('sh25') },
+        { key: 'sh26', label: 'Britax share, ' + Y + ' YTD', render: function (r) { return fin(r.sh26) ? r.sh26.toFixed(2) + '%' : '—'; }, csv: csvs('sh26') },
         { key: 'd', label: 'Share change', render: function (r) { return '<b class="' + gcls(r.d) + '">' + (fin(r.d) ? (r.d > 0.0049 ? '+' : r.d < -0.0049 ? '−' : '') + Math.abs(r.d).toFixed(2) + ' pts' : '—') + '</b>'; }, csv: csvs('d') },
         { key: 'impact', label: 'Sales effect of share change', render: function (r) { return fin(r.impact) ? '<b class="' + gcls(r.impact) + '">' + (r.impact >= 0 ? '+' : '−') + '$' + Math.abs(r.impact / 1e6).toFixed(2) + 'M</b>' : '—'; }, csv: csvs('impact') }
       ], ov.rows.map(function (r) { r._cls = worst && r.t === worst.t && r.impact < 0 ? 'me' : ''; return r; }));
@@ -453,7 +455,7 @@
         if ($('tt5')) { var c = A.tierChange(M, si, t, g); chgRows.push({ _cls: g === 'Britax group' ? 'me' : '', _first: j === 0, tlabel: A.tierLabel(si, t), brand: tgname(g), was: c.was, now: c.now, d: c.d }); }
       });
     });
-    if ($('tt1b')) table($('tt1b'), 'tt1b', [tcol, bcol, { key: 'sh25', label: 'Share, 2025', render: function (r) { return fin(r.sh25) ? r.sh25.toFixed(2) + '%' : '—'; }, csv: csvs('sh25') }, { key: 'sh26', label: 'Share, 2026 YTD', render: function (r) { return fin(r.sh26) ? r.sh26.toFixed(2) + '%' : '—'; }, csv: csvs('sh26') },
+    if ($('tt1b')) table($('tt1b'), 'tt1b', [tcol, bcol, { key: 'sh25', label: 'Share, ' + PY, render: function (r) { return fin(r.sh25) ? r.sh25.toFixed(2) + '%' : '—'; }, csv: csvs('sh25') }, { key: 'sh26', label: 'Share, ' + Y + ' YTD', render: function (r) { return fin(r.sh26) ? r.sh26.toFixed(2) + '%' : '—'; }, csv: csvs('sh26') },
       { key: 'd', label: 'Change', render: function (r) { return '<b class="' + gcls(r.d) + '">' + (fin(r.d) ? (r.d > 0.0049 ? '+' : r.d < -0.0049 ? '−' : '') + Math.abs(r.d).toFixed(2) + ' pts' : '—') + '</b>'; }, csv: csvs('d') }], brRows);
     if ($('tt2')) table($('tt2'), 'tt2', [tcol, bcol,
       { key: 'n', label: 'Products sold, 2026 YTD', render: function (r) { return num(r.n); }, csv: csvs('n') },
@@ -468,12 +470,12 @@
       { key: 'gap', label: 'On promo vs not on promo', render: function (r) { return '<b class="' + (r.gap < 0 ? 'down' : '') + '">' + sgn(r.gap) + '</b>'; }, csv: csvs('gap') }
     ], promoRows);
     if ($('tt4')) table($('tt4'), 'tt4', [tcol, bcol,
-      { key: 'a', label: '2026 YTD share', render: pcf('a'), csv: csvs('a') }, { key: 'o', label: 'Other weeks', render: pcf('o'), csv: csvs('o') }, { key: 'p', label: 'Prime weeks', render: pcf('p'), csv: csvs('p') },
+      { key: 'a', label: Y + ' YTD share', render: pcf('a'), csv: csvs('a') }, { key: 'o', label: 'Other weeks', render: pcf('o'), csv: csvs('o') }, { key: 'p', label: 'Prime weeks', render: pcf('p'), csv: csvs('p') },
       { key: 'lift', label: 'Prime weeks vs other', render: ptsc('lift'), csv: csvs('lift') },
-      { key: 'f', label: 'First 13 weeks of 2026', render: pcf('f'), csv: csvs('f') }, { key: 'l', label: 'Last 13 weeks', render: pcf('l'), csv: csvs('l') }, { key: 'd', label: 'Change', render: ptsc('d'), csv: csvs('d') }
+      { key: 'f', label: 'First quarter of ' + Y, render: pcf('f'), csv: csvs('f') }, { key: 'l', label: 'Last quarter', render: pcf('l'), csv: csvs('l') }, { key: 'd', label: 'Change', render: ptsc('d'), csv: csvs('d') }
     ], vsRows);
     if ($('tt5')) table($('tt5'), 'tt5', [tcol, bcol, { key: 'was', label: 'Earlier', render: pcf('was'), csv: csvs('was') }, { key: 'now', label: 'Latest', render: pcf('now'), csv: csvs('now') }, { key: 'd', label: 'Change', render: ptsc('d'), csv: csvs('d') }], chgRows);
-    PRIME.filter(function (e) { return e.week >= 80; }).forEach(function (e, i) {
+    PRIME.filter(function (e) { return e.week >= Wd.h[0] && e.week <= LAST; }).forEach(function (e, i) {
       var el = $('tt-e' + i); if (!el) return;
       var rows = [];
       [0, 1, 2].forEach(function (t) { BR.concat(['All competitors']).forEach(function (g, j) { var s = A.tierEvent(M, si, t, g, e.week); rows.push({ _cls: g === 'Britax group' ? 'me' : '', _first: j === 0, tlabel: A.tierLabel(si, t), brand: tgname(g), before: s.before, during: s.during, after: s.after, dd: s.dDuring, da: s.after == null ? null : s.dAfter, ix: s.ix }); }); });
@@ -528,15 +530,15 @@
     var si = state.seg, c = A.compareRows(M, si);
     if (!c) { return '<section class="card"><p class="muted">No data for this category.</p></section>'; }
     var best = c.comps.filter(function (r) { return r.d > 0; }).sort(function (x, y) { return y.d - x.d; })[0];
-    var h = '<section class="card"><h2>Share comparison: 2026 year to date vs 2025</h2><p class="sub">' + esc(segName(si)) + ' · Amazon US estimated sales and share of all tracked brands in the category. 2026 YTD = weeks of Dec 28, 2025 to Oct 11, 2026 (42 weeks); 2025 = weeks of Dec 29, 2024 to Dec 21, 2025; 2025 same weeks = Dec 29, 2024 to Oct 12, 2025. Same windows as the CommerceIQ platform.</p>';
-    h += '<div class="answer"><p><b>Britax group:</b> ' + pct2(c.britax.sh26) + ' share in 2026 YTD vs ' + pct2(c.britax.sh25) + ' in 2025 (<b class="' + gcls(c.britax.d) + '">' + pts(c.britax.d) + '</b>); sales ' + sgn(c.britax.chg) + ' vs the same weeks of 2025 while the category moved ' + sgn(c.totalChg) + '.' + (best ? ' <b>Biggest competitor share gain:</b> ' + esc(best.brand) + ' ' + pts(best.d) + '.' : '') + '</p></div>';
-    var th = '<thead><tr><th class="l" rowspan="2"></th><th class="l" rowspan="2">Brand</th><th colspan="4" style="text-align:center;background:#CFD9F2;color:#210235">Estimated sales</th><th colspan="3" style="text-align:center;background:#CFD9F2;color:#210235">Market share</th></tr><tr><th style="background:#E3EFD5">2026 YTD</th><th style="background:#E3EFD5">2025</th><th style="background:#E3EFD5">2025 same weeks</th><th style="background:#DDD">% change vs same weeks</th><th style="background:#E3EFD5">2026 YTD</th><th style="background:#E3EFD5">2025</th><th style="background:#DDD">Difference</th></tr></thead>';
+    var h = '<section class="card"><h2>Share comparison: ' + Y + ' year to date vs ' + PY + '</h2><p class="sub">' + esc(segName(si)) + ' · Amazon US estimated sales and share of all tracked brands in the category. ' + Y + ' YTD = weeks of ' + Wd.range(Wd.ytd) + '; ' + PY + ' = weeks of ' + Wd.range(Wd.py) + '; ' + PY + ' same weeks = ' + Wd.range(Wd.pytd) + '. A week counts in the month it ends in, which reproduces the CommerceIQ platform’s windows.</p>';
+    h += '<div class="answer"><p><b>Britax group:</b> ' + pct2(c.britax.sh26) + ' share in ' + Y + ' YTD vs ' + pct2(c.britax.sh25) + ' in ' + PY + ' (<b class="' + gcls(c.britax.d) + '">' + pts(c.britax.d) + '</b>); sales ' + sgn(c.britax.chg) + ' vs the same weeks of ' + PY + ' while the category moved ' + sgn(c.totalChg) + '.' + (best ? ' <b>Biggest competitor share gain:</b> ' + esc(best.brand) + ' ' + pts(best.d) + '.' : '') + '</p></div>';
+    var th = '<thead><tr><th class="l" rowspan="2" style="font-weight:800;color:#210235"></th><th class="l" rowspan="2" style="font-weight:800;color:#210235;font-size:14px">Brand</th><th colspan="4" style="text-align:center;background:#CFD9F2;color:#210235;font-weight:800;font-size:14px;letter-spacing:.02em;border-bottom:2px solid #210235">Estimated sales</th><th colspan="3" style="text-align:center;background:#CFD9F2;color:#210235;font-weight:800;font-size:14px;letter-spacing:.02em;border-bottom:2px solid #210235">Market share</th></tr><tr><th style="background:#E3EFD5;font-weight:700;color:#210235;font-size:12.5px">' + Y + ' YTD</th><th style="background:#E3EFD5;font-weight:700;color:#210235;font-size:12.5px">' + PY + '</th><th style="background:#E3EFD5;font-weight:700;color:#210235;font-size:12.5px">' + PY + ' same weeks</th><th style="background:#DDD;font-weight:700;color:#210235;font-size:12.5px">% change vs same weeks</th><th style="background:#E3EFD5;font-weight:700;color:#210235;font-size:12.5px">' + Y + ' YTD</th><th style="background:#E3EFD5;font-weight:700;color:#210235;font-size:12.5px">' + PY + '</th><th style="background:#DDD;font-weight:700;color:#210235;font-size:12.5px">Difference</th></tr></thead>';
     var row = function (r, cl) { return '<tr class="' + cl + '"><td></td><td class="l">' + esc(r.brand) + '</td><td>' + usdM(r.s26) + '</td><td>' + usdM(r.s25) + '</td><td>' + usdM(r.s25b) + '</td><td class="' + gcls(r.chg) + '">' + sgn(r.chg, 2) + '</td><td>' + pct2(r.sh26) + '</td><td>' + pct2(r.sh25) + '</td><td><b class="' + gcls(r.d) + '">' + (fin(r.d) ? (r.d > 0.0049 ? '+' : r.d < -0.0049 ? '−' : '') + Math.abs(r.d).toFixed(2) + '%' : '—') + '</b></td></tr>'; };
     var body = '<tbody><tr><td class="l" colspan="9" style="background:var(--soft);color:var(--ink);font-weight:700">Competitor brands</td></tr>' + c.comps.map(function (r) { return row(r, ''); }).join('') + row(c.top, 'all').replace('<td class="l">', '<td class="l"><b>') .replace('</td><td>', '</b></td><td>') +
       '<tr><td class="l" colspan="9" style="background:#FAF0FF;color:var(--ink);font-weight:700">Client brands</td></tr>' + c.own.map(function (r) { return row(r, 'me'); }).join('') + (c.own.length > 1 ? row(c.britax, 'me') : '') + '</tbody>';
     h += '<div class="scroll"><table class="tbl" id="t12">' + th + body + '</table></div>';
-    h += '<p class="rule">% change compares 2026 YTD with the same 42 weeks of 2025, so the shorter period does not read as a decline. Difference is 2026 YTD share minus full-year 2025 share, in percentage points; full-year 2025 includes the Q4 peak, so read gains and losses of under 1 pt with care. Top competitors = the eight largest by 2025 plus 2026 YTD sales in the category.</p></section>';
-    h += '<section class="card"><h2>Category total</h2><div class="scroll"><table class="tbl"><thead><tr><th class="l"></th><th>2026 YTD</th><th>2025</th><th>2025 same weeks</th><th>% change vs same weeks</th></tr></thead><tbody><tr class="all"><td class="l">' + esc(segName(si)) + ' total</td><td>' + usdM(c.total.s26) + '</td><td>' + usdM(c.total.s25) + '</td><td>' + usdM(c.total.s25b) + '</td><td class="' + gcls(c.totalChg) + '">' + sgn(c.totalChg, 2) + '</td></tr></tbody></table></div></section>';
+    h += '<p class="rule">% change compares ' + Y + ' YTD with the same weeks of ' + PY + ', so the shorter period does not read as a decline. Difference is ' + Y + ' YTD share minus full-year ' + PY + ' share, in percentage points; full-year ' + PY + ' includes the Q4 peak, so read gains and losses of under 1 pt with care. Top competitors = the eight largest brands in the category (of the pool loaded), ranked on ' + Y + ' YTD sales.</p></section>';
+    h += '<section class="card"><h2>Category total</h2><div class="scroll"><table class="tbl"><thead><tr><th class="l"></th><th>' + Y + ' YTD</th><th>' + PY + '</th><th>' + PY + ' same weeks</th><th>% change vs same weeks</th></tr></thead><tbody><tr class="all"><td class="l">' + esc(segName(si)) + ' total</td><td>' + usdM(c.total.s26) + '</td><td>' + usdM(c.total.s25) + '</td><td>' + usdM(c.total.s25b) + '</td><td class="' + gcls(c.totalChg) + '">' + sgn(c.totalChg, 2) + '</td></tr></tbody></table></div></section>';
     return h;
   }
 
@@ -569,13 +571,13 @@
       return donut(sl, [segName(si), '$' + (T[tk] / 1e6).toFixed(1) + 'M']);
     };
     var card = function (title, sub, inner) { return '<section class="card" style="margin-top:0"><h2 style="font-size:16px">' + title + '</h2><p class="sub" style="margin-bottom:6px">' + sub + '</p>' + inner + '</section>'; };
-    var h = '<section class="card" style="background:#5f5f5f;color:#fff;padding:12px 18px"><h2 style="color:#fff;margin:0;text-align:center">Summary: ' + esc(segName(si)) + '</h2></section>';
+    var h = '<section class="card" style="background:#5f5f5f;color:#fff;padding:12px 18px"><h2 style="color:#fff;margin:0;text-align:center">Market share summary: ' + esc(segName(si)) + '</h2></section>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:16px">';
-    h += card('Market share (Britax vs others)', '2026 year to date', britaxDonut('s26', 's26')) + card('Market share (Britax and top competitor brands)', '2026 year to date, share of estimated sales', brandDonut('s26', 's26'));
-    h += card('Market share (Britax vs others)', '2025 full year', britaxDonut('s25', 's25')) + card('Market share (Britax and top competitor brands)', '2025 full year, share of estimated sales', brandDonut('s25', 's25'));
+    h += card('Market share (Britax vs others)', Y + ' year to date', britaxDonut('s26', 's26')) + card('Market share (Britax and top competitor brands)', Y + ' year to date, share of estimated sales', brandDonut('s26', 's26'));
+    h += card('Market share (Britax vs others)', PY + ' full year', britaxDonut('s25', 's25')) + card('Market share (Britax and top competitor brands)', PY + ' full year, share of estimated sales', brandDonut('s25', 's25'));
     var mx = Math.max.apply(null, c.own.concat(c.comps).map(function (r) { return r.n26 || 0; })) || 1;
     var bars = c.own.concat(c.comps).sort(function (a, b) { return (b.n26 || 0) - (a.n26 || 0); }).map(function (r) { return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:13px"><span style="width:110px;text-align:right;flex:none">' + esc(r.brand) + '</span><span style="height:12px;border-radius:3px;background:' + (r.own ? BRITAX : '#6AA84F') + ';width:' + Math.max(2, Math.round((r.n26 || 0) / mx * 60)) + '%"></span><b>' + (r.n26 || 0) + '</b></div>'; }).join('');
-    h += card('Brands and ASIN count', '2026 YTD, ASINs with sales. Total tracked in the category: ' + num(T.n26), bars);
+    if (T.n26 != null) h += card('Brands and ASIN count', Y + ' YTD, ASINs with sales. Total tracked in the category: ' + num(T.n26), bars);
     h += '</div>';
     return h;
   }
@@ -593,12 +595,12 @@
       '<li><b>Stability, last 6 months:</b> Raised or Cut if the net change is 3% or more; “Stable, promotes often” if four or more clean weeks sit 5% below baseline or the weekly swing is 3 pts or more.</li>' +
       '<li><b>Price tiers:</b> each category’s products are split into three tiers (Value, Mid, Premium) by the product’s own average price since Jan 2024, with cut-offs that put about a third of the category’s 2026 YTD sales in each tier. The “By price tier” block on each of those cards repeats the table or chart by tier, for Britax vs all competitors, to show which tier the share loss comes from.</li>' +
       '<li><b>Price elasticity:</b> from the CommerceIQ price elasticity feed, which models Britax group products only (latest feed Mar 29, 2026). The headline figure is the 2026 YTD sales-weighted elasticity across all products with a model.</li>' +
-      '<li><b>Share comparison and summary:</b> estimated sales and share of all tracked brands in the category. 2026 YTD covers the 42 weeks from Dec 28, 2025 to Oct 11, 2026; sales change is against the same 42 weeks of 2025, and share difference is against full-year 2025. Top competitors are the eight largest by 2025 plus 2026 YTD sales.</li>' +
+      '<li><b>Share comparison and summary:</b> estimated sales and share of all tracked brands in the category. the year to date covers the weeks that end in January to the selected month; sales change is against the same weeks a year earlier, and share difference is against the full prior year.</li>' +
       '<li><b>Share:</b> brand sales ($) ÷ sales of all tracked brands in the category, as on the CommerceIQ platform. Estimates, so read small moves (under 0.3 pts) as noise.</li>' +
       '<li><b>Limits:</b> estimates, not reported sales. Brands with too few matching products lack a long trend. The latest Prime event has few weeks after it.</li></ul></details>';
   }
 
-  function viewShareSummary() { $('view').innerHTML = compareHtml() + summaryHtml(); }
+  function viewShareSummary() { $('view').innerHTML = summaryHtml() + compareHtml(); }
 
   // Keep each view to title, short description and table or graph: no insight boxes, and the notes under each table sit in a collapsed "Sources and notes" block.
   function tidy() {
@@ -612,7 +614,7 @@
   }
   new MutationObserver(tidy).observe($('view'), { childList: true, subtree: true });
 
-  function render() { sync(); drawTabs(); ({ price: viewPrice, market: viewMarket, skus: viewSkus, share: viewShare, elasticity: viewElasticity, summary: viewShareSummary })[state.view](); }
+  function render() { useMonth(); sync(); drawMonth(); drawTabs(); ({ price: viewPrice, market: viewMarket, skus: viewSkus, share: viewShare, elasticity: viewElasticity, summary: viewShareSummary })[state.view](); }
   renderMethod();
   render();
 })();

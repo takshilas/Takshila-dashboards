@@ -1,8 +1,6 @@
 import { check } from './verify-ck.mjs';
 check('data-prices.js', 'promo prices', 'BRITAX_PRICES');
 check('data-skuall.js', 'sku detail', 'BRITAX_SKUALL', 5);
-check('data-compare.js', 'brand sales', 'BRITAX_CMP', 3);
-check('data-compare.js', 'segment totals', 'BRITAX_CMPTOT', 1);
 check('data-asp.js', 'average selling prices', 'BRITAX_ASP');
 check('data-elasticity.js', 'elasticity by level', 'BRITAX_ELAST', 3);
 check('data-tier-asp.js', 'tier average prices', 'BRITAX_TIERASP', 3);

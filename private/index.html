@@ -87,6 +87,7 @@
   details.tier[open] > summary { margin-bottom:6px; } details.tier .tbl { margin-top:6px; }
   details.src { margin-top:8px; } details.src > summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); }
   details.src[open] > summary { margin-bottom:4px; } details.src > p.rule { margin-top:4px; }
+  .monthbar { margin:8px 0 6px; } .monthbar select { min-width:150px; } #monthNote { font-size:13px; }
   .spark { display:block; }
   @media (max-width:600px) { h1 { font-size:23px; } .tile .v { font-size:20px; } }
 </style>
@@ -96,6 +97,7 @@
   <div class="eyebrow">CommerceIQ · Market intelligence</div>
   <h1>Britax US pricing and share on Amazon</h1>
   <p class="sub asof" id="asof"></p>
+  <div class="controls monthbar"><label for="monthSel"><b>Month</b></label> <select id="monthSel" aria-label="Month"></select> <span id="monthNote" class="muted"></span></div>
 
   <div class="bar"><div class="bar-in">
     <div role="tablist" aria-label="View" class="tabs" id="viewTabs"></div>
@@ -111,7 +113,7 @@
 <script src="/assets/data-r12.js"></script>
 <script src="/assets/data-prices.js"></script>
 <script src="/assets/data-skuall.js"></script>
-<script src="/assets/data-compare.js"></script>
+<script src="/assets/data-brand-weekly.js"></script>
 <script src="/assets/data-asp.js"></script>
 <script src="/assets/data-tier-weekly.js"></script>
 <script src="/assets/data-tier-asp.js"></script>
