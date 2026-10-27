@@ -32,13 +32,13 @@
   function f1(v) { return v == null || !isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1); }
 
   function parse(D) {
-    var out = { wk: {}, r12: {}, skus: [], prices: {}, ladder: [], range: {}, skuall: [], skucov: {}, cmp: {}, asp: {}, tw: {}, ta: {}, tp: {}, ti: {}, el: [] };
+    var out = { wk: {}, r12: {}, skus: [], prices: {}, ladder: [], range: {}, skuall: [], skucov: {}, cmp: {}, asp: {}, tw: {}, ta: {}, tp: {}, ti: {}, el: [], tsk: {} };
     D.weekly.forEach(function (r) { var p = r.split('|'); (out.wk[+p[0]] = out.wk[+p[0]] || {})[p[1]] = { s: nums(p[2]), u: nums(p[3]) }; });
     D.r12.forEach(function (r) {
       var p = r.split('|'), place = function (s) { var a = [], v = nums(s); for (var i = 0; i < 52; i++) a[R12_START + i] = v[i]; return a; };
       (out.r12[+p[0]] = out.r12[+p[0]] || {})[p[1]] = { idx: place(p[2]), pu: place(p[3]), un: place(p[4]) };
     });
-    D.skus.forEach(function (r) {
+    (D.skus || []).forEach(function (r) {
       var p = r.split('|'), b = p[5].split(','), pr = []; nums(p[6]).forEach(function (v, i) { pr[R12_START + i] = v; });
       out.skus.push({ si: +p[0], own: p[1] === 'B', asin: p[2], brand: p[3], title: p[4].trim(), base: +b[0], u13: +b[1], price: pr });
     });
@@ -58,6 +58,10 @@
     (D.tierbrasp || []).forEach(function (r) { var p = r.split('|'); put(out.ta, p, nums(p[3])); });
     (D.tierbrpromo || []).forEach(function (r) { var p = r.split('|'), v = nums(p[3]); put(out.tp, p, { np: v[0] || 0, sp: v[1] || 0, nn: v[2] || 0, sn: v[3] || 0 }); });
     (D.tierbridx || []).forEach(function (r) { var p = r.split('|'); put(out.ti, p, nums(p[3])); });
+    (D.tierskus || []).forEach(function (r) {
+      var p = r.split('|'), b = p[6].split(','), pr = []; nums(p[7]).forEach(function (v, i) { pr[R12_START + i] = v; });
+      ((out.tsk[+p[0]] = out.tsk[+p[0]] || {})[+p[1]] = out.tsk[+p[0]][+p[1]] || []).push({ own: p[2] === 'B', asin: p[3], brand: p[4], title: p[5].trim(), base: +b[0], u13: +b[1], asp: +b[2], price: pr });
+    });
     (D.tierasp || []).forEach(function (r) { var p = r.split('|'); put(out.ta, p, nums(p[3])); });
     (D.tierpromo || []).forEach(function (r) { var p = r.split('|'), v = nums(p[3]); put(out.tp, p, { np: v[0] || 0, sp: v[1] || 0, nn: v[2] || 0, sn: v[3] || 0 }); });
     (D.tieridx || []).forEach(function (r) { var p = r.split('|'); put(out.ti, p, nums(p[3])); });
@@ -240,8 +244,8 @@
   }
 
   // Key products: current price vs the SKU's 12-month baseline, range, promo weeks.
-  function skuRows(M, si, own) {
-    return M.skus.filter(function (s) { return s.si === si && s.own === own; }).map(function (s) {
+  // Weekly-price statistics of one key product (current price, vs baseline, promo weeks, recent promotions, status).
+  function skuStat(s) {
       var p = s.price, have = p.filter(function (v) { return v != null; });
       var cur = avg(slice(p, 98, 101)), last = p[W - 1];
       var promoWk = have.filter(function (v) { return v <= 0.95 * s.base; }).length;
@@ -252,10 +256,15 @@
       var flags = [];
       if (cur != null && up <= -5) flags.push('On promo now'); else if (cur != null && up >= 5) flags.push('Priced above baseline'); else flags.push('At baseline');
       if (have.length && promoWk / have.length >= 0.25) flags.push('Promotes often');
-      return { brand: s.brand, title: s.title, asin: s.asin, base: s.base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, 93, W - 1).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags };
-    });
+      return { brand: s.brand, title: s.title, asin: s.asin, base: s.base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, 93, W - 1).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags, asp: s.asp };
   }
-
+  function skuRows(M, si, own) {
+    return M.skus.filter(function (s) { return s.si === si && s.own === own; }).map(skuStat);
+  }
+  // Key products of one price tier: the best-selling Britax products (own) or competitor products.
+  function tierSkuRows(M, si, tier, own) {
+    return ((M.tsk[si] && M.tsk[si][tier]) || []).filter(function (s) { return s.own === own; }).map(skuStat);
+  }
 
   // ---------- price tiers ----------
   // Each category's ASINs are split into three tiers by the ASIN's own average price since Jan 2024 (cut-offs below), so an ASIN keeps one tier in every period.
@@ -341,7 +350,7 @@
   var api = { W: W, R12_START: R12_START, SEGMENTS: SEGMENTS, CORE: CORE, PRIME: PRIME, TARIFF: TARIFF,
     wkDate: wkDate, wkIso: wkIso, wkLabel: wkLabel, monthLabel: monthLabel, primeWeek: primeWeek, excluded: excluded, f1: f1, avg: avg,
     parse: parse, trendSeries: trendSeries, findMoves: findMoves, stability: stability, tariffRow: tariffRow, brands: brands,
-    promoStats: promoStats, compareRows: compareRows, priceRows: priceRows, promoPrices: promoPrices, skuAll: skuAll, shareWeeks: shareWeeks, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows,
+    promoStats: promoStats, compareRows: compareRows, priceRows: priceRows, promoPrices: promoPrices, skuAll: skuAll, shareWeeks: shareWeeks, shareSeries: shareSeries, shareChange: shareChange, shareEvent: shareEvent, skuRows: skuRows, tierSkuRows: tierSkuRows,
     TIER_NAMES: TIER_NAMES, tierRange: tierRange, tierLabel: tierLabel, tierShare: tierShare, tierShareSeries: tierShareSeries, tierOverview: tierOverview, tierPrice: tierPrice, tierPromo: tierPromo, tierBrands: tierBrands, tierBrandShare: tierBrandShare, tierPrimeVs: tierPrimeVs, tierChange: tierChange, tierEvent: tierEvent,
     elastRows: elastRows, elastStat: elastStat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.BritaxAnalytics = api;

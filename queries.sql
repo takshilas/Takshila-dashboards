@@ -102,3 +102,7 @@ SELECT 1;
 -- U) Competitor detail by price tier (data-tier-brand.js): same tier CTE as S), restricted to the top 5 competitors of each category (the 'sel' list used on the Price and promo tab):
 --    weekly sales in $100 for weeks 12..105, product counts and price sums for the six price windows, 6-month promo and off-promo counts and price sums, and the promo price index at weeks 89 and 104.
 --    scripts/verify-tier.mjs also checks that the competitors' tier sales do not exceed all competitors' sales in the tier.
+
+-- V) Key products by price tier (data-tier-skus.js): same tier CTE as S). Per category x tier: the 3 best-selling Britax group ASINs and the 5 best-selling competitor ASINs by sales over weeks 80..105 (ASINs with a 52-week baseline: median weekly price over weeks 54..105,
+--    10+ weeks of 2+ units), with units per week over weeks 93..105, the 52-week average selling price (sales / units) and the weekly price (sales / units where units >= 2) for weeks 54..105.
+--    data-skus.js (top products by sales, not by tier) and data-range.js (price range by category) were removed.

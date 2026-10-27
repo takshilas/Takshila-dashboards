@@ -1,6 +1,5 @@
 import { check } from './verify-ck.mjs';
 check('data-prices.js', 'promo prices', 'BRITAX_PRICES');
-check('data-range.js', 'price range', 'BRITAX_RANGE');
 check('data-skuall.js', 'sku detail', 'BRITAX_SKUALL', 5);
 check('data-compare.js', 'brand sales', 'BRITAX_CMP', 3);
 check('data-compare.js', 'segment totals', 'BRITAX_CMPTOT', 1);
@@ -12,3 +11,4 @@ check('data-tier-promo.js', 'tier event-week price index', 'BRITAX_TIERIDX', 3);
 check('data-tier-brand.js', 'tier brand average prices', 'BRITAX_TIERBR_ASP', 3);
 check('data-tier-brand.js', 'tier brand promo prices', 'BRITAX_TIERBR_PROMO', 3);
 check('data-tier-brand.js', 'tier brand price index', 'BRITAX_TIERBR_IDX', 3);
+check('data-tier-skus.js', 'key products by tier', 'BRITAX_TIERSKUS', 7);

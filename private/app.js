@@ -1,7 +1,7 @@
 // Britax US pricing and share dashboard. Renders from precomputed tables (private/data-*.js); nothing is queried in the browser.
 (function () {
   var A = window.BritaxAnalytics;
-  var M = A.parse({ weekly: window.BRITAX_WEEKLY, r12: window.BRITAX_R12, skus: window.BRITAX_SKUS, prices: window.BRITAX_PRICES, range: window.BRITAX_RANGE, skuall: window.BRITAX_SKUALL, skucov: window.BRITAX_SKUCOV, cmp: window.BRITAX_CMP, cmptot: window.BRITAX_CMPTOT, asp: window.BRITAX_ASP, tierwk: window.BRITAX_TIERWK, tierasp: window.BRITAX_TIERASP, tierpromo: window.BRITAX_TIERPROMO, tierbrwk: window.BRITAX_TIERBR_WK, tierbrasp: window.BRITAX_TIERBR_ASP, tierbrpromo: window.BRITAX_TIERBR_PROMO, tierbridx: window.BRITAX_TIERBR_IDX, tieridx: window.BRITAX_TIERIDX, elast: window.BRITAX_ELAST });
+  var M = A.parse({ weekly: window.BRITAX_WEEKLY, r12: window.BRITAX_R12, prices: window.BRITAX_PRICES, skuall: window.BRITAX_SKUALL, skucov: window.BRITAX_SKUCOV, cmp: window.BRITAX_CMP, cmptot: window.BRITAX_CMPTOT, asp: window.BRITAX_ASP, tierwk: window.BRITAX_TIERWK, tierskus: window.BRITAX_TIERSKUS, tierasp: window.BRITAX_TIERASP, tierpromo: window.BRITAX_TIERPROMO, tierbrwk: window.BRITAX_TIERBR_WK, tierbrasp: window.BRITAX_TIERBR_ASP, tierbrpromo: window.BRITAX_TIERBR_PROMO, tierbridx: window.BRITAX_TIERBR_IDX, tieridx: window.BRITAX_TIERIDX, elast: window.BRITAX_ELAST });
   var P6 = 80; // first week of the 6-month promo window (week of Apr 19, 2026)
   var SEG = A.SEGMENTS, CORE = A.CORE, PRIME = A.PRIME, W = A.W, f1 = A.f1, R0 = A.R12_START, LAST = W - 1;
   var $ = function (id) { return document.getElementById(id); };
@@ -17,16 +17,16 @@
   var BRITAX = '#C231FF', COMP_ALL = '#210235';
 
   var VIEWS = [
-    { id: 'price', label: 'Price and promo' },
+    { id: 'summary', label: 'Share comparison and category summary' },
     { id: 'market', label: 'Market share' },
-    { id: 'skus', label: 'Key competitor products' },
     { id: 'share', label: 'Share around Prime days' },
-    { id: 'elasticity', label: 'Price elasticity' },
-    { id: 'summary', label: 'Share comparison and category summary' }
+    { id: 'price', label: 'Price and promo' },
+    { id: 'skus', label: 'Key competitor products' },
+    { id: 'elasticity', label: 'Price elasticity' }
   ];
   var q = new URLSearchParams(location.search);
   function clampInt(v, lo, hi, d) { var n = parseInt(v, 10); return isNaN(n) ? d : Math.max(lo, Math.min(hi, n)); }
-  var state = { lvl: 'brand', view: VIEWS.some(function (v) { return v.id === q.get('view'); }) ? q.get('view') : 'price', seg: clampInt(q.get('seg'), 0, 4, 0), overlay: {}, tierBrand: 'Britax group' };
+  var state = { lvl: 'brand', view: VIEWS.some(function (v) { return v.id === q.get('view'); }) ? q.get('view') : 'summary', seg: clampInt(q.get('seg'), 0, 4, 0), overlay: {}, tierBrand: 'Britax group' };
   function sync() { history.replaceState(null, '', '?view=' + state.view + '&seg=' + state.seg + location.hash); }
 
   $('asof').innerHTML = 'Amazon US · weekly Market Share estimates · data through week of <b>' + A.wkIso(LAST) + '</b> · tariff period Jan–Jun 2025 · Prime events: June and October';
@@ -34,7 +34,7 @@
   // ---------- tabs ----------
   function drawTabs() {
     $('viewTabs').innerHTML = VIEWS.map(function (v) { return '<button class="tab view" role="tab" data-v="' + v.id + '" aria-selected="' + (v.id === state.view) + '">' + esc(v.label) + '</button>'; }).join('');
-    var segs = state.view === 'skus' ? CORE : (state.view === 'summary' || state.view === 'elasticity') ? [0, 1, 2, 3, 4] : [0, 1, 2, 3];
+    var segs = (state.view === 'summary' || state.view === 'elasticity') ? [0, 1, 2, 3, 4] : [0, 1, 2, 3];
     if (state.seg > 3 && segs.indexOf(state.seg) < 0) state.seg = segs[0];
     if (segs.indexOf(state.seg) < 0) state.seg = segs[0];
     $('segTabs').innerHTML = segs.map(function (i) { return '<button class="tab" role="tab" data-s="' + i + '" aria-selected="' + (i === state.seg) + '">' + esc(i === 4 ? 'All categories' : SEG[i]) + '</button>'; }).join('');
@@ -318,61 +318,31 @@
     ], rows);
   }
 
-  // ====================== view 3: key products ======================
-  var CAT_SHORT = ['Car Seats', 'Strollers', 'Travel Systems', 'Accessories'];
+  // ====================== key products by price tier ======================
   function viewSkus() {
     var si = state.seg;
-    var mine = A.skuRows(M, si, true), comp = A.skuRows(M, si, false);
-    var h = '<section class="card"><h2>Key competitor products</h2><p class="sub">The two largest Britax categories, Car Seats and Strollers, make up about 88% of Britax est. sales in 2026 year to date. For each, the best-selling Britax products and the best-selling competitor products by sales, priced against their own 12-month baseline.</p>';
-    var rb = M.range[si] && M.range[si].B, rc = M.range[si] && M.range[si].C;
-    h += '<div class="answer"><p>' + esc(SEG[si]) + ': ' + (rb && rc ? 'median product price <b>' + usd(rb.med) + '</b> for Britax vs <b>' + usd(rc.med) + '</b> for competitors; promoted units over the last 13 weeks <b>' + rb.p13.toFixed(0) + '%</b> vs <b>' + rc.p13.toFixed(0) + '%</b>. ' : '') + (function () {
-      var on = comp.filter(function (r) { return r.flags.indexOf('On promo now') >= 0; }).length;
-      return on + ' of ' + comp.length + ' tracked competitor products are priced 5% or more below their baseline now (weeks 98–101).';
-    })() + '</p></div>';
-    h += '<h3>Price range and promotion by category</h3><div class="scroll"><table class="tbl" id="t10"></table></div>' + csvBtn('t10') + '<p class="rule">Low, median and high are the 12-month average selling prices of products that sold 100+ units. Promoted units = share of units sold 5% or more below the product’s own 12-month median price.</p>';
-    h += '<h3>Britax products</h3><div class="scroll"><table class="tbl" id="t5"></table></div>' + csvBtn('t5');
-    h += '<h3>Competitor products</h3><div class="scroll"><table class="tbl" id="t6"></table></div>' + csvBtn('t6');
-    h += '<p class="rule">Price now = average of the latest four weeks. “Weeks on promo” counts weeks at least 5% below baseline. Recent promotions look at the last 13 weeks. The tables cover the best-selling products (up to 5 Britax, 15 competitor) by units.</p></section>';
-    h += '<section class="card"><h2>Britax sales by category</h2><p class="sub">Britax group est. sales, 2026 year to date, $M</p><div class="scroll"><table class="tbl" id="t7"></table></div></section>';
+    var h = '<section class="card"><h2>Key competitor products</h2><p class="sub">' + esc(SEG[si]) + ' · in each price tier, the 3 best-selling Britax products and the 5 best-selling competitor products by sales over the last 26 weeks, priced against their own 52-week baseline. Price tiers: ' + tierNote(si) + '.</p>';
+    [0, 1, 2].forEach(function (t) { h += '<h3>' + esc(A.tierLabel(si, t)) + '</h3><div class="scroll"><table class="tbl" id="sk' + t + '"></table></div>' + csvBtn('sk' + t); });
+    h += '<p class="rule">Price now = average of the latest four weeks. 52-week average selling price = sales ÷ units over the last 52 weeks. Baseline = the product’s median weekly price over 52 weeks; “Weeks on promo” counts weeks at least 5% below it, and recent promotions look at the last 13 weeks. Status: On promo now = price now 5% or more below baseline; Priced above baseline = 5% or more above; Promotes often = on promo in a quarter or more of weeks. Products need a 52-week baseline (10+ weeks of 2+ units); a tier shows fewer than 3 Britax products where Britax sells fewer there.</p></section>';
     $('view').innerHTML = h;
     var cols = [
       { key: 'brand', label: 'Brand', l: 1 },
       { key: 'title', label: 'Product', l: 1, wrap: 1, render: function (r) { return esc(r.title) + '<div class="muted" style="font-size:12px">' + esc(r.asin) + '</div>'; }, csv: function (r) { return r.title; } },
       { key: 'u13', label: 'Units/wk', render: function (r) { return num(r.u13); } },
-      { key: 'base', label: '12-month baseline', render: function (r) { return usd(r.base); } },
+      { key: 'asp', label: '52-week avg selling price', render: function (r) { return usd(r.asp); } },
       { key: 'cur', label: 'Price now', render: function (r) { return usd(r.cur); } },
       { key: 'vs', label: 'Now vs baseline', render: function (r) { return '<span class="' + cls(r.vs) + '">' + sgn(r.vs) + '</span>'; } },
       { key: 'lo', label: 'Low–high', render: function (r) { return usd(r.lo) + '–' + usd(r.hi); }, sort: function (r) { return r.hi - r.lo; }, csv: function (r) { return usd(r.lo) + '-' + usd(r.hi); } },
       { key: 'promoWk', label: 'Weeks on promo', render: function (r) { return r.promoWk + ' of ' + r.weeks; } },
       { key: 'recent', label: 'Promo weeks, last 13', render: function (r) { return r.recentWk + ' of ' + r.recentOf; }, sort: function (r) { return r.recentWk; }, csv: function (r) { return r.recentWk; } },
       { key: 'deep', label: 'Deepest recent promo', render: function (r) { return r.deepest == null ? '—' : '−' + r.deepest.toFixed(0) + '%'; }, sort: function (r) { return r.deepest; }, csv: function (r) { return r.deepest; } },
-      { key: 'last', label: 'Last on promo', render: function (r) { return r.lastPromo == null ? '—' : esc(A.wkLabel(r.lastPromo).replace(/, \d{4}/, '')); }, sort: function (r) { return r.lastPromo; }, csv: function (r) { return r.lastPromo == null ? '' : A.wkLabel(r.lastPromo); } },
-      { key: 'spark', label: 'Weekly price', render: function (r) { return spark(r.price, R0, LAST, r.base); }, sort: function () { return null; }, csv: function () { return ''; } },
       { key: 'flags', label: 'Status', render: function (r) { return r.flags.map(function (f) { return '<span class="pill ' + (f === 'On promo now' ? 'warn' : f === 'Promotes often' ? 'info' : f === 'Priced above baseline' ? 'bad' : 'good') + '">' + f + '</span>'; }).join(' '); }, sort: function (r) { return r.vs; }, csv: function (r) { return r.flags.join('; '); } }
     ];
-    mine.forEach(function (r) { r._cls = 'me'; });
-    table($('t5'), 't5', cols, mine); table($('t6'), 't6', cols, comp);
-    var rg = [];
-    CORE.forEach(function (sg) { ['B', 'C'].forEach(function (k) { var r = M.range[sg] && M.range[sg][k]; if (r) rg.push({ _cls: k === 'B' ? 'me' : '', seg: SEG[sg], who: k === 'B' ? 'Britax' : 'Competitors', n: r.n, lo: r.lo, med: r.med, hi: r.hi, p52: r.p52, p13: r.p13 }); }); });
-    table($('t10'), 't10', [
-      { key: 'seg', label: 'Category', l: 1 }, { key: 'who', label: 'Own / competitor', l: 1 },
-      { key: 'n', label: 'Products' },
-      { key: 'lo', label: 'Low', render: function (r) { return usd(r.lo); } },
-      { key: 'med', label: 'Median', render: function (r) { return usd(r.med); } },
-      { key: 'hi', label: 'High', render: function (r) { return usd(r.hi); } },
-      { key: 'p52', label: '% of units on promo, 12 months', render: function (r) { return r.p52.toFixed(0) + '%'; } },
-      { key: 'p13', label: '% of units on promo, last 13 weeks', render: function (r) { return r.p13.toFixed(0) + '%'; } }
-    ], rg);
-    var cs = CAT_SHORT.map(function (n, k) { var rows = (M.cmp[k] && M.cmp[k].rows || []).filter(function (r) { return r.own; }); return { name: n, v: rows.reduce(function (a, r) { return a + r.s26; }, 0) / 1e6, top: CORE.indexOf(k) >= 0 }; }).sort(function (a, b) { return b.v - a.v; });
-    var tot = cs.reduce(function (a, r) { return a + r.v; }, 0);
-    cs.forEach(function (r) { r.sh = r.v / tot * 100; });
-    cs.push({ _cls: 'all', name: 'Total', v: tot, sh: 100, top: false });
-    table($('t7'), 't7', [
-      { key: 'name', label: 'Category', l: 1 },
-      { key: 'v', label: '$M', render: function (r) { return r.v.toFixed(1); } },
-      { key: 'sh', label: 'Share of Britax sales', render: function (r) { return r.sh.toFixed(0) + '%'; } },
-      { key: 'top', label: 'Shown here', render: function (r) { return r.top ? '<span class="pill good">Yes</span>' : ''; }, sort: function (r) { return r.top ? 1 : 0; } }
-    ], cs);
+    [0, 1, 2].forEach(function (t) {
+      var mine = A.tierSkuRows(M, si, t, true), comp = A.tierSkuRows(M, si, t, false);
+      mine.forEach(function (r) { r._cls = 'me'; });
+      table($('sk' + t), 'sk' + t, cols, mine.concat(comp));
+    });
   }
 
   // ====================== view 4: share ======================
