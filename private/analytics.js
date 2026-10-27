@@ -181,7 +181,7 @@
     return ['Britax group', 'All competitors'].concat(others);
   }
 
-  // 12-month promotion summary (baseline = each SKU's own 12-month median). Weighted by units.
+  // 12-month promotion summary (baseline = each SKU's own 12-month average selling price). Weighted by units.
   function promoStats(M, si, brand) {
     var r = M.r12[si] && M.r12[si][brand]; if (!r) return null;
     var tot = { p: 0, u: 0, pp: 0, pu: 0, np: 0, nu: 0, ix: 0, pw: 0 }, primeWeeks = [];

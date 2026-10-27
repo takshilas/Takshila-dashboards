@@ -131,3 +131,8 @@ w AS (SELECT x.a, x.si, x.tr, x.bg, COUNT(p_ytd) n1, COALESCE(SUM(p_ytd),0) t1, 
 SELECT concat(CAST(a DIV 12 AS STRING),'-',lpad(CAST(a%12+1 AS STRING),2,'0'),'|',CAST(si AS STRING),'|',CASE WHEN tr=9 THEN 'A' ELSE CAST(tr AS STRING) END,'|',bg,'|',array_join(array(CAST(n1 AS STRING),CAST(ROUND(t1) AS STRING),CAST(n2 AS STRING),CAST(ROUND(t2) AS STRING),CAST(n3 AS STRING),CAST(ROUND(t3) AS STRING),CAST(n4 AS STRING),CAST(ROUND(t4) AS STRING)),',',''),'|',
  CAST(CAST(n1+ROUND(t1)+n2+ROUND(t2)+n3+ROUND(t3)+n4+ROUND(t4) AS BIGINT) AS STRING)) row FROM w WHERE n1+n2+n3+n4>0 ORDER BY a, si, tr, bg
 ;
+
+-- X) Baseline change: every promo figure now uses the ASIN's average selling price over weeks 54..105 (SUM(sales) / SUM(units), rows with units and sales > 0; ASINs still need 10+ weeks of 2+ units)
+--    instead of the median weekly price. Promotion = weekly price <= 0.95 x baseline (rows with 2+ units, price within 0.5x-2x of baseline). In queries C, E, H, S and U replace
+--    percentile(price, 0.5) by SUM(s) / SUM(u) in the baseline CTE; nothing else changes. Files rebuilt: data-r12.js (index and % on promotion; units unchanged), data-prices.js, data-skuall.js,
+--    data-tier-promo.js, data-tier-brand.js (promo and event-week index). data-tier-skus.js already used the same average selling price. Key products and promo tables now share one baseline.
