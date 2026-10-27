@@ -1,0 +1,56 @@
+// Average price on promotion vs off promotion by price tier, last 6 months (weeks of Apr 19 to Oct 11, 2026), simple average across products. Tiers as in data-tier-weekly.js.
+// Baseline = each ASIN's median weekly price over the last 52 weeks (10+ weeks of 2+ units); promotion = price 5% or more below baseline. Each product's price on and off promotion = its sales / units over the 6 months.
+// BRITAX_TIERPROMO row: category | tier | Britax group or All competitors | products with promo weeks, sum of their promo prices, products with off-promo weeks, sum of their off-promo prices | checksum.
+// BRITAX_TIERIDX row: category | tier | Britax group or All competitors | price index in the Prime Day Jun 2026 week (week 89) and the Prime Big Deal Days Oct 2026 week (week 104), 100 = the products' 52-week baselines (sales / sum of baseline x units) | checksum.
+window.BRITAX_TIERPROMO = [
+'0|0|All competitors|220,15822,334,27481|43857',
+'0|0|Britax group|2,171,4,336|513',
+'0|1|All competitors|126,24692,204,47811|72833',
+'0|1|Britax group|13,2959,17,4804|7793',
+'0|2|All competitors|114,44403,198,88059|132774',
+'0|2|Britax group|35,11540,39,15733|27347',
+'1|0|All competitors|249,28597,462,59694|89002',
+'1|0|Britax group|1,134,1,194|330',
+'1|1|All competitors|217,66104,352,123925|190598',
+'1|1|Britax group|10,3145,10,4092|7257',
+'1|2|All competitors|109,81551,172,153794|235626',
+'1|2|Britax group|2,1360,2,1723|3087',
+'2|0|All competitors|61,12664,85,21359|34169',
+'2|0|Britax group|1,88,1,110|200',
+'2|1|All competitors|36,12482,52,21190|33760',
+'2|1|Britax group|8,2892,10,4193|7103',
+'2|2|All competitors|46,23829,83,53401|77359',
+'2|2|Britax group|4,2325,6,4160|6495',
+'3|0|All competitors|1280,17692,1942,31072|51986',
+'3|0|Britax group|1,21,2,45|69',
+'3|1|All competitors|763,25702,1212,49108|76785',
+'3|1|Britax group|8,320,16,787|1131',
+'3|2|All competitors|265,43383,450,81221|125319',
+'3|2|Britax group|8,849,18,2716|3591'
+];
+window.BRITAX_TIERIDX = [
+'0|0|All competitors|89.8,88.6|178.4',
+'0|0|Britax group|79.0,81.1|160.1',
+'0|1|All competitors|80.2,80.8|161.0',
+'0|1|Britax group|75.0,72.4|147.4',
+'0|2|All competitors|83.3,86.9|170.2',
+'0|2|Britax group|76.4,80.4|156.8',
+'1|0|All competitors|94.6,94.3|188.9',
+'1|0|Britax group|68.8,97.2|166.0',
+'1|1|All competitors|90.1,89.1|179.2',
+'1|1|Britax group|91.0,84.5|175.5',
+'1|2|All competitors|95.9,96.9|192.8',
+'1|2|Britax group|76.5,77.9|154.4',
+'2|0|All competitors|93.7,86.5|180.2',
+'2|0|Britax group|100.0,100.0|200.0',
+'2|1|All competitors|86.3,92.1|178.4',
+'2|1|Britax group|97.5,93.5|191.0',
+'2|2|All competitors|91.8,95.4|187.2',
+'2|2|Britax group|83.9,84.0|167.9',
+'3|0|All competitors|95.1,97.0|192.1',
+'3|0|Britax group|85.5,100.0|185.5',
+'3|1|All competitors|94.7,97.2|191.9',
+'3|1|Britax group|94.1,95.6|189.7',
+'3|2|All competitors|95.1,95.4|190.5',
+'3|2|Britax group|93.8,98.0|191.8'
+];

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Britax US pricing and share</title>
+<meta name="description" content="Britax US on Amazon: competitor price trends and tariff moves, promotions against a 12-month baseline, key competitor products, and share around Prime days.">
+<meta property="og:title" content="Britax US pricing and share">
+<meta property="og:description" content="Competitor price trends, promotions against a 12-month baseline, key competitor products, and share around Prime days.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Britax US pricing and share">
+<meta name="twitter:description" content="Competitor price trends, promotions against a 12-month baseline, key competitor products, and share around Prime days.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#FFFFFF; --ink:#210235; --body:#000000; --muted:#5b5266; --line:#E7E2EC; --soft:#F7F4FA;
+    --britax:#C231FF; --comp:#1F22B2; --sec:#5AAFFE; --up:#B42318; --down:#067647; --amber:#B54708; --amberbg:#FFF4E5; --greenbg:#E8F6EE; --bluebg:#EAF4FF; --redbg:#FDECEC;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:120px; }
+  body { margin:0; background:var(--bg); color:var(--body); font-family:'DM Sans',system-ui,sans-serif; font-size:15px; line-height:1.5; }
+  main { max-width:1180px; margin:0 auto; padding:24px 16px 72px; }
+  h1 { color:var(--ink); font-size:30px; line-height:1.15; margin:0 0 6px; font-weight:700; }
+  h2 { color:var(--ink); font-size:20px; line-height:1.25; margin:0 0 4px; font-weight:700; }
+  h3 { color:var(--ink); font-size:15px; margin:20px 0 6px; font-weight:700; }
+  p { margin:0 0 8px; }
+  code, li { overflow-wrap:anywhere; }
+  .eyebrow { color:var(--britax); font-weight:700; font-size:12px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+  .sub { color:var(--muted); margin:0 0 14px; }
+  .muted { color:var(--muted); }
+  .bar { position:sticky; top:0; z-index:5; background:rgba(255,255,255,.97); border-bottom:1px solid var(--line); margin:0 -16px; padding:10px 16px; }
+  .bar-in { max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:8px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:8px; }
+  .tab { border:1px solid var(--line); background:#fff; color:var(--ink); padding:7px 13px; border-radius:999px; font:inherit; cursor:pointer; }
+  .tab[aria-selected="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .tab.view { border-radius:8px; font-weight:700; }
+  .tab.view[aria-selected="true"] { background:var(--britax); border-color:var(--britax); }
+  .tab:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid var(--sec); outline-offset:2px; }
+  .asof { color:var(--muted); font-size:13px; }
+  section.card { border:1px solid var(--line); border-radius:12px; padding:18px; margin-top:18px; background:#fff; }
+  .answer { background:var(--soft); border-left:4px solid var(--britax); border-radius:8px; padding:10px 14px; margin:10px 0 12px; }
+  .answer p { margin:0 0 6px; } .answer p:last-child { margin:0; }
+  .answer b { color:var(--ink); }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:10px 0; }
+  .tile { border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--soft); }
+  .tile .k { color:var(--muted); font-size:12px; }
+  .tile .v { color:var(--ink); font-size:22px; font-weight:700; line-height:1.2; margin:2px 0; }
+  .tile .d { font-size:12px; color:var(--muted); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin:8px 0 2px; font-size:13px; color:var(--muted); align-items:center; }
+  .legend i { display:inline-block; width:18px; height:3px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+  .legend .sw { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+  .legend label { cursor:pointer; user-select:none; }
+  .chartwrap { position:relative; }
+  svg text { font-family:'DM Sans',system-ui,sans-serif; }
+  .tip { position:absolute; pointer-events:none; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; box-shadow:0 4px 14px rgba(33,2,53,.12); display:none; min-width:170px; z-index:2; }
+  .tip b { color:var(--ink); }
+  .tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .tbl th, .tbl td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; vertical-align:middle; }
+  .tbl th:first-child, .tbl td:first-child, .tbl .l { text-align:left; }
+  .tbl th { color:var(--muted); font-weight:500; font-size:12px; position:sticky; top:0; background:#fff; }
+  .tbl th button { all:unset; cursor:pointer; color:inherit; }
+  .tbl th button:hover { color:var(--ink); }
+  .tbl th button:focus-visible { outline:2px solid var(--sec); outline-offset:2px; }
+  .tbl tr.me td { background:#FAF0FF; font-weight:700; }
+  .tbl tr.all td { background:var(--soft); font-weight:700; }
+  .tbl td.wrap { white-space:normal; min-width:220px; text-align:left; }
+  .scroll { overflow-x:auto; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  select, .btn { border:1px solid var(--line); border-radius:8px; padding:7px 10px; font:inherit; background:#fff; color:var(--ink); }
+  .btn { cursor:pointer; background:#fff; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+  .pill.good { background:var(--greenbg); color:var(--down); }
+  .pill.warn { background:var(--amberbg); color:var(--amber); }
+  .pill.bad { background:var(--redbg); color:var(--up); }
+  .pill.info { background:var(--bluebg); color:var(--comp); }
+  .pill.plain { background:var(--soft); color:var(--muted); }
+  ul.notes { margin:6px 0 0 18px; padding:0; }
+  ul.notes li { margin:4px 0; }
+  .note { background:#FFF7E6; border:1px solid #F2D9A6; border-radius:10px; padding:9px 12px; font-size:13px; margin-top:10px; }
+  .rule { font-size:13px; color:var(--muted); margin-top:8px; }
+  details.tier { margin-top:12px; border-top:1px solid var(--line, #E7E2EC); padding-top:8px; } details.tier > summary { cursor:pointer; font-weight:700; color:var(--ink); }
+  details.tier[open] > summary { margin-bottom:6px; } details.tier .tbl { margin-top:6px; }
+  details.src { margin-top:8px; } details.src > summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); }
+  details.src[open] > summary { margin-bottom:4px; } details.src > p.rule { margin-top:4px; }
+  .spark { display:block; }
+  @media (max-width:600px) { h1 { font-size:23px; } .tile .v { font-size:20px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">CommerceIQ · Market intelligence</div>
+  <h1>Britax US pricing and share on Amazon</h1>
+  <p class="sub asof" id="asof"></p>
+
+  <div class="bar"><div class="bar-in">
+    <div role="tablist" aria-label="View" class="tabs" id="viewTabs"></div>
+    <div role="tablist" aria-label="Segment" class="tabs" id="segTabs"></div>
+  </div></div>
+
+  <div id="view"></div>
+
+  <section class="card" id="method"></section>
+</main>
+
+<script src="/assets/data-weekly.js"></script>
+<script src="/assets/data-r12.js"></script>
+<script src="/assets/data-skus.js"></script>
+<script src="/assets/data-prices.js"></script>
+<script src="/assets/data-range.js"></script>
+<script src="/assets/data-skuall.js"></script>
+<script src="/assets/data-compare.js"></script>
+<script src="/assets/data-asp.js"></script>
+<script src="/assets/data-tier-weekly.js"></script>
+<script src="/assets/data-tier-asp.js"></script>
+<script src="/assets/data-tier-promo.js"></script>
+<script src="/assets/data-tier-brand.js"></script>
+<script src="/assets/data-elasticity.js"></script>
+<script src="/assets/analytics.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>
