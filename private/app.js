@@ -578,7 +578,7 @@
       return donut(sl, [segName(si), '$' + (T[tk] / 1e6).toFixed(1) + 'M']);
     };
     var card = function (title, sub, inner) { return '<section class="card" style="margin-top:0"><h2 style="font-size:16px">' + title + '</h2><p class="sub" style="margin-bottom:6px">' + sub + '</p>' + inner + '</section>'; };
-    var h = '<section class="card" style="background:#5f5f5f;color:#fff;padding:12px 18px"><h2 style="color:#fff;margin:0;text-align:center">Market share summary: ' + esc(segName(si)) + '</h2></section>';
+    var h = '<section class="card" style="padding:0;margin-top:0"><h2 style="margin:0;text-align:center;font-size:20px">Market share summary: ' + esc(segName(si)) + '</h2></section>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:16px">';
     h += card('Britax share of category', Y + ' year to date', britaxDonut('s26', 's26')) + card('Who holds the share?', Y + ' year to date, share of estimated sales', brandDonut('s26', 's26'));
     h += card('Britax share of category', PY + ' full year', britaxDonut('s25', 's25')) + card('Who held the share?', PY + ' full year, share of estimated sales', brandDonut('s25', 's25'));
