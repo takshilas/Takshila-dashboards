@@ -82,11 +82,24 @@
   ul.notes { margin:6px 0 0 18px; padding:0; }
   ul.notes li { margin:4px 0; }
   .note { background:#FFF7E6; border:1px solid #F2D9A6; border-radius:10px; padding:9px 12px; font-size:13px; margin-top:10px; }
+  .held { color:#9a5b00; background:#fff6e5; border-left:3px solid #f0a500; padding:6px 10px; border-radius:4px; }
+  .lane { margin-top:16px; border:1px solid var(--line); border-left:5px solid var(--britax); border-radius:12px; background:var(--soft); padding:12px 14px 14px; }
+  .lane + .lane { border-left-color:var(--sec); }
+  .lane-h { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:10px; color:var(--ink); }
+  .lane-tag { background:var(--ink); color:#fff; border-radius:999px; padding:3px 12px; font-weight:700; font-size:13px; }
+  .lane-meta { color:var(--muted); font-style:italic; font-size:13px; margin-left:auto; }
+  .lane-grid { display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.5fr); gap:14px; }
+  .lane-grid section.card { margin-top:0; }
+  /* Card titles as banners; descriptions and notes in italic */
+  section.card > h2 { background:var(--ink); color:#fff; margin:-18px -18px 14px; padding:12px 18px; font-size:18px; border-bottom:3px solid var(--britax); border-radius:11px 11px 0 0; }
+  section.card > h3, section.card h3 { background:var(--soft); border-left:4px solid var(--britax); padding:7px 12px; border-radius:0 6px 6px 0; font-size:14px; }
+  .sub, .rule, details.src p, details.src > p.rule, .held { font-style:italic; }
   .rule { font-size:13px; color:var(--muted); margin-top:8px; }
   details.tier { margin-top:12px; border-top:1px solid var(--line, #E7E2EC); padding-top:8px; } details.tier > summary { cursor:pointer; font-weight:700; color:var(--ink); }
   details.tier[open] > summary { margin-bottom:6px; } details.tier .tbl { margin-top:6px; }
   details.src { margin-top:8px; } details.src > summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); }
   details.src[open] > summary { margin-bottom:4px; } details.src > p.rule { margin-top:4px; }
+  .monthbar { margin:8px 0 6px; } .monthbar select { min-width:150px; } #monthNote { font-size:13px; }
   .spark { display:block; }
   @media (max-width:600px) { h1 { font-size:23px; } .tile .v { font-size:20px; } }
 </style>
@@ -96,6 +109,7 @@
   <div class="eyebrow">CommerceIQ · Market intelligence</div>
   <h1>Britax US pricing and share on Amazon</h1>
   <p class="sub asof" id="asof"></p>
+  <div class="controls monthbar"><label for="monthSel"><b>Month</b></label> <select id="monthSel" aria-label="Month"></select> <span id="monthNote" class="muted"></span></div>
 
   <div class="bar"><div class="bar-in">
     <div role="tablist" aria-label="View" class="tabs" id="viewTabs"></div>
@@ -109,16 +123,16 @@
 
 <script src="/assets/data-weekly.js"></script>
 <script src="/assets/data-r12.js"></script>
-<script src="/assets/data-skus.js"></script>
 <script src="/assets/data-prices.js"></script>
-<script src="/assets/data-range.js"></script>
 <script src="/assets/data-skuall.js"></script>
-<script src="/assets/data-compare.js"></script>
+<script src="/assets/data-brand-weekly.js"></script>
 <script src="/assets/data-asp.js"></script>
+<script src="/assets/data-anchor-asp.js"></script>
 <script src="/assets/data-tier-weekly.js"></script>
 <script src="/assets/data-tier-asp.js"></script>
 <script src="/assets/data-tier-promo.js"></script>
 <script src="/assets/data-tier-brand.js"></script>
+<script src="/assets/data-tier-skus.js"></script>
 <script src="/assets/data-elasticity.js"></script>
 <script src="/assets/analytics.js"></script>
 <script src="/assets/app.js"></script>

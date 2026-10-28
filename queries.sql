@@ -102,3 +102,37 @@ SELECT 1;
 -- U) Competitor detail by price tier (data-tier-brand.js): same tier CTE as S), restricted to the top 5 competitors of each category (the 'sel' list used on the Price and promo tab):
 --    weekly sales in $100 for weeks 12..105, product counts and price sums for the six price windows, 6-month promo and off-promo counts and price sums, and the promo price index at weeks 89 and 104.
 --    scripts/verify-tier.mjs also checks that the competitors' tier sales do not exceed all competitors' sales in the tier.
+
+-- V) Key products by price tier (data-tier-skus.js): same tier CTE as S). Per category x tier: the 3 best-selling Britax group ASINs and the 5 best-selling competitor ASINs by sales over weeks 80..105 (ASINs with a 52-week baseline: median weekly price over weeks 54..105,
+--    10+ weeks of 2+ units), with units per week over weeks 93..105, the 52-week average selling price (sales / units) and the weekly price (sales / units where units >= 2) for weeks 54..105.
+--    data-skus.js (top products by sales, not by tier) and data-range.js (price range by category) were removed.
+
+-- W) Month selector, price anchors (data-anchor-asp.js): one block per selectable month (Jan 2026 to the latest month). A week counts in the month its Saturday falls in. Query below is run with the anchor list (month index = year*12 + month-1, e.g. 24312 = Jan 2026);
+--    the prior-year window only uses weeks that have a 2026 counterpart (date_add(WEEK_START_DATE,364) <= latest week start) so the latest month reproduces data-asp.js / data-tier-asp.js (checked by scripts/verify-anchor.mjs).
+--    Month, share, sales and tier-share figures are computed in the browser from the weekly files (data-weekly.js, data-tier-weekly.js, data-brand-weekly.js), so they need no anchor.
+--    Still precomputed for the latest week only (flagged on the page when an earlier month is selected): promo on / off-promo prices and their 12-month baseline, Prime-event price index, elasticity weights, key products by tier.
+WITH f AS (SELECT year(date_add(WEEK_START_DATE,6))*12+month(date_add(WEEK_START_DATE,6))-1 em, year(date_add(WEEK_START_DATE,370))*12+month(date_add(WEEK_START_DATE,370))-1 emp,
+  CASE CATEGORY WHEN 'Car Seats' THEN 0 WHEN 'Strollers' THEN 1 WHEN 'Travel Systems' THEN 2 WHEN 'Accessories' THEN 3 END si, ASIN asin, BRAND brand, CLIENT_FLAG='client' isb, SALES_ESTIMATES_TOTAL s, UNIT_ESTIMATES_TOTAL u
+ FROM client_catalog.marketshare_cubes.ms_estimations_metadata WHERE CLIENT_ID=1224 AND WEEK_START_DATE>=DATE'2024-01-07' AND BRAND IS NOT NULL AND CLIENT_FLAG IN ('client','comp') AND UNIT_ESTIMATES_TOTAL>0 AND SALES_ESTIMATES_TOTAL>0),
+g AS (SELECT * FROM f WHERE si IS NOT NULL),
+ap AS (SELECT si, asin, SUM(s)/SUM(u) p FROM g GROUP BY 1,2),
+t AS (SELECT si, asin, CASE si WHEN 0 THEN CASE WHEN p<160 THEN 0 WHEN p<290 THEN 1 ELSE 2 END WHEN 1 THEN CASE WHEN p<200 THEN 0 WHEN p<550 THEN 1 ELSE 2 END WHEN 2 THEN CASE WHEN p<315 THEN 0 WHEN p<450 THEN 1 ELSE 2 END ELSE CASE WHEN p<25 THEN 0 WHEN p<75 THEN 1 ELSE 2 END END tier FROM ap),
+sel AS (SELECT * FROM VALUES (0,'Graco'),(0,'Evenflo'),(0,'Safety 1st'),(0,'Chicco'),(0,'Baby Trend'),(1,'Uppababy'),(1,'Graco'),(1,'Mompush'),(1,'Delta Children'),(1,'Mamazing'),(2,'Graco'),(2,'Evenflo'),(2,'Baby Trend'),(2,'Joie'),(2,'Chicco'),(3,'Uppababy'),(3,'JL Childress'),(3,'Graco'),(3,'Momcozy'),(3,'Shynerk') AS t(si,b)),
+anch AS (SELECT * FROM VALUES (24312),(24313),(24314) -- add one value per month AS t(a)),
+a AS (SELECT an.a, g.si, t.tier, g.isb, g.brand, g.asin,
+  SUM(CASE WHEN g.em BETWEEN (an.a DIV 12)*12 AND an.a THEN g.s END)/SUM(CASE WHEN g.em BETWEEN (an.a DIV 12)*12 AND an.a THEN g.u END) p_ytd,
+  SUM(CASE WHEN g.emp BETWEEN (an.a DIV 12)*12 AND an.a THEN g.s END)/SUM(CASE WHEN g.emp BETWEEN (an.a DIV 12)*12 AND an.a THEN g.u END) p_pytd,
+  SUM(CASE WHEN g.em=an.a THEN g.s END)/SUM(CASE WHEN g.em=an.a THEN g.u END) p_m,
+  SUM(CASE WHEN g.em=an.a-1 THEN g.s END)/SUM(CASE WHEN g.em=an.a-1 THEN g.u END) p_pm
+  FROM g JOIN t ON t.si=g.si AND t.asin=g.asin CROSS JOIN anch an GROUP BY 1,2,3,4,5,6),
+x AS (SELECT a.*, b.bg, tt.tr FROM a LATERAL VIEW explode(array(CASE WHEN isb THEN 'Britax group' ELSE brand END, CASE WHEN NOT isb THEN 'All competitors' END)) b AS bg LATERAL VIEW explode(array(tier, 9)) tt AS tr WHERE b.bg IS NOT NULL),
+w AS (SELECT x.a, x.si, x.tr, x.bg, COUNT(p_ytd) n1, COALESCE(SUM(p_ytd),0) t1, COUNT(p_pytd) n2, COALESCE(SUM(p_pytd),0) t2, COUNT(p_m) n3, COALESCE(SUM(p_m),0) t3, COUNT(p_pm) n4, COALESCE(SUM(p_pm),0) t4
+  FROM x LEFT JOIN sel ON sel.si=x.si AND sel.b=x.bg WHERE x.bg IN ('Britax group','All competitors') OR sel.b IS NOT NULL GROUP BY 1,2,3,4)
+SELECT concat(CAST(a DIV 12 AS STRING),'-',lpad(CAST(a%12+1 AS STRING),2,'0'),'|',CAST(si AS STRING),'|',CASE WHEN tr=9 THEN 'A' ELSE CAST(tr AS STRING) END,'|',bg,'|',array_join(array(CAST(n1 AS STRING),CAST(ROUND(t1) AS STRING),CAST(n2 AS STRING),CAST(ROUND(t2) AS STRING),CAST(n3 AS STRING),CAST(ROUND(t3) AS STRING),CAST(n4 AS STRING),CAST(ROUND(t4) AS STRING)),',',''),'|',
+ CAST(CAST(n1+ROUND(t1)+n2+ROUND(t2)+n3+ROUND(t3)+n4+ROUND(t4) AS BIGINT) AS STRING)) row FROM w WHERE n1+n2+n3+n4>0 ORDER BY a, si, tr, bg
+;
+
+-- X) Baseline change: every promo figure now uses the ASIN's average selling price over weeks 54..105 (SUM(sales) / SUM(units), rows with units and sales > 0; ASINs still need 10+ weeks of 2+ units)
+--    instead of the median weekly price. Promotion = weekly price <= 0.95 x baseline (rows with 2+ units, price within 0.5x-2x of baseline). In queries C, E, H, S and U replace
+--    percentile(price, 0.5) by SUM(s) / SUM(u) in the baseline CTE; nothing else changes. Files rebuilt: data-r12.js (index and % on promotion; units unchanged), data-prices.js, data-skuall.js,
+--    data-tier-promo.js, data-tier-brand.js (promo and event-week index). data-tier-skus.js already used the same average selling price. Key products and promo tables now share one baseline.
