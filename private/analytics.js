@@ -31,7 +31,7 @@
     var m = key ? mIdx(key) : LATEST; if (!(m <= LATEST)) m = LATEST; if (m < FIRST_SELECTABLE) m = FIRST_SELECTABLE;
     var y = Math.floor(m / 12), jan = y * 12;
     var o = { key: mKey(m), ix: m, label: mName(m), year: y,
-      month: weeksBetween(m, m), prev: weeksBetween(m - 1, m - 1), q: weeksBetween(m - 2, m), h: weeksBetween(m - 5, m), y12: weeksBetween(m - 11, m),
+      month: weeksBetween(m, m), prev: weeksBetween(m - 1, m - 1), q: weeksBetween(m - 2, m), lq: weeksBetween(m - 3, m - 1), h: weeksBetween(m - 5, m), y12: weeksBetween(m - 11, m),
       ytd: weeksBetween(jan, m), py: weeksBetween(jan - 12, jan - 1), q1: weeksBetween(jan, jan + 2).filter(function (w) { return w <= weeksBetween(m, m).slice(-1)[0]; }) };
     o.pytd = o.ytd.map(function (w) { return w - 52; }).filter(function (w) { return w >= 0; }); // the same weeks one year (52 weeks) earlier
     o.last = o.month[o.month.length - 1];
@@ -302,6 +302,7 @@
       // Price now = average weekly price in the selected month (latest weeks if the month has no price); baseline = the product's average selling price over the last 12 months.
       var cur = avg(WIN.month.map(function (w) { return p[w]; }));
       if (cur == null) cur = avg(slice(p, WIN.last - 3, WIN.last)); var last = p[WIN.last];
+      var lq = avg(WIN.lq.map(function (w) { return p[w]; })), vsLq = cur != null && lq ? (cur / lq - 1) * 100 : null;
       var promoWk = have.filter(function (v) { return v <= 0.95 * base; }).length;
       var up = cur != null && base ? (cur / base - 1) * 100 : null;
       // Recent promotions: the last 13 weeks to the selected month, 5% or more below the baseline, the deepest of them, and the latest promoted week.
@@ -310,7 +311,7 @@
       var flags = [];
       if (cur != null && up <= -5) flags.push('On promo now'); else if (cur != null && up >= 5) flags.push('Priced above baseline'); else flags.push('At baseline');
       if (have.length && promoWk / have.length >= 0.25) flags.push('Promotes often');
-      return { brand: s.brand, title: s.title, asin: s.asin, base: base, u13: s.u13, cur: cur, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, lo13, WIN.last).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags, asp: s.asp };
+      return { brand: s.brand, title: s.title, asin: s.asin, base: base, u13: s.u13, cur: cur, lq: lq, vsLq: vsLq, last: last, vs: up, lo: Math.min.apply(null, have), hi: Math.max.apply(null, have), promoWk: promoWk, recentWk: recent.length, recentOf: slice(p, lo13, WIN.last).filter(function (v) { return v != null; }).length, deepest: deepest, lastPromo: lastPromo, weeks: have.length, price: p, flags: flags, asp: s.asp };
   }
   function skuRows(M, si, own) {
     return M.skus.filter(function (s) { return s.si === si && s.own === own; }).map(skuStat);
