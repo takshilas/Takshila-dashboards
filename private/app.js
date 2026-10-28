@@ -579,13 +579,17 @@
     };
     var card = function (title, sub, inner) { return '<section class="card" style="margin-top:0"><h2 style="font-size:16px">' + title + '</h2><p class="sub" style="margin-bottom:6px">' + sub + '</p>' + inner + '</section>'; };
     var h = '<section class="card" style="padding:0;margin-top:0"><h2 style="margin:0;text-align:center;font-size:20px">Market share summary: ' + esc(segName(si)) + '</h2></section>';
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:16px">';
-    h += card('Britax share of category', Y + ' year to date', britaxDonut('s26', 's26')) + card('Who holds the share?', Y + ' year to date, share of estimated sales', brandDonut('s26', 's26'));
-    h += card('Britax share of category', PY + ' full year', britaxDonut('s25', 's25')) + card('Who held the share?', PY + ' full year, share of estimated sales', brandDonut('s25', 's25'));
+    var lane = function (tag, title, meta, left, right) {
+      return '<div class="lane"><div class="lane-h"><span class="lane-tag">' + tag + '</span><b>' + title + '</b><span class="lane-meta">' + meta + '</span></div><div class="lane-grid">' + left + right + '</div></div>';
+    };
+    var dpts = fin(c.britax.d) ? ' · <b class="' + gcls(c.britax.d) + '">' + (c.britax.d >= 0 ? '+' : '−') + Math.abs(c.britax.d).toFixed(2) + ' pts vs ' + PY + '</b>' : '';
+    h += lane('Latest', Y + ' year to date', 'Britax ' + pct2(c.britax.sh26) + dpts + ' · category $' + (T.s26 / 1e6).toFixed(1) + 'M',
+      card('Britax share of category', Y + ' year to date', britaxDonut('s26', 's26')), card('Who holds the share?', Y + ' year to date, share of estimated sales', brandDonut('s26', 's26')));
+    h += lane('Prior year', PY + ' full year', 'Britax ' + pct2(c.britax.sh25) + ' · category $' + (T.s25 / 1e6).toFixed(1) + 'M',
+      card('Britax share of category', PY + ' full year', britaxDonut('s25', 's25')), card('Who held the share?', PY + ' full year, share of estimated sales', brandDonut('s25', 's25')));
     var mx = Math.max.apply(null, c.own.concat(c.comps).map(function (r) { return r.n26 || 0; })) || 1;
     var bars = c.own.concat(c.comps).sort(function (a, b) { return (b.n26 || 0) - (a.n26 || 0); }).map(function (r) { return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:13px"><span style="width:110px;text-align:right;flex:none">' + esc(r.brand) + '</span><span style="height:12px;border-radius:3px;background:' + (r.own ? BRITAX : '#6AA84F') + ';width:' + Math.max(2, Math.round((r.n26 || 0) / mx * 60)) + '%"></span><b>' + (r.n26 || 0) + '</b></div>'; }).join('');
-    if (T.n26 != null) h += card('Brands and ASIN count', Y + ' YTD, ASINs with sales. Total tracked in the category: ' + num(T.n26), bars);
-    h += '</div>';
+    if (T.n26 != null) h += '<div style="margin-top:16px">' + card('Brands and ASIN count', Y + ' YTD, ASINs with sales. Total tracked in the category: ' + num(T.n26), bars) + '</div>';
     return h;
   }
 
